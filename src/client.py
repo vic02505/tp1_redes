@@ -1,7 +1,8 @@
+import ctypes
 import socket
 import math
 import time
-from communications import Datagram, Header, ACK
+from communications import Datagram, MessageType
 
 
 FRAGMENT_SIZE = 1024
@@ -16,10 +17,15 @@ class Client:
     def connect(self):
         self.socket.connect((self.host, self.port))
         # Esperar ACK del servidor
+        self.socket.recv(1024)
         # TODO: Implementar los mensajes en conjunto de comunicacion cliente-servidor 
         
     def upload(self, document_name):
-
+        
+        # Enviar mensaje de upload a Servidor y espera ACK
+        self.socket.send(b'upload')
+        self.socket.recv(1024)
+                
         # Abrir el archivo y leer su contenido
         with open(document_name, 'rb') as file:
             file_contents = file.read()
@@ -31,46 +37,58 @@ class Client:
         fragment_count = math.ceil(len(file_contents) / FRAGMENT_SIZE) 
         datagrams = []
         
+        # Generamos los datagramas a enviar
         for i in fragment_count:
             start = i * FRAGMENT_SIZE
             end = min(start + FRAGMENT_SIZE, len(file_contents))
             fragment = file_contents[start:end]
-            datagram = Datagram(i, fragment_count, len(fragment), fragment)
+            datagram = Datagram.create_content(i, fragment_count, len(fragment), fragment)
             datagrams.append(datagram)
         
         # Timeout muy grande y tomamos medida de este ack 
         
         # enviar a server primera comunicacion de va archivo con x tamaño
-        header = Header("archivo nombrar", len(file_contents), fragment_count)
+        header = Datagram.create_download_header(document_name, len(file_contents), fragment_count)
         sendTime = time.time()
         self.socket.send(header.encode())  # Send the header to the server
         
         # esperar ack
-        ack = self.socket.recv(len(ACK()))  # Wait to  an ACK from the server
-        recvTime = time.end()
+        ack = self.socket.recv(len(Datagram))  # Wait to  an ACK from the server
+        recvTime = time.time()
+        
+        rcvd: Datagram = ack.decode()
+        
+        if rcvd.total_packet_count != MessageType.ACK:
+            print("Error en la comunicacion")
+            return
         
         firstTimeoutMeasure = recvTime - sendTime
         
-        aproximateTimeout = firstTimeoutMeasure * 1.5 * (len(datagram) / len(header))
-        # Timeout pasa a ser esta medida x factor de dif tamaño x 1,5 (flucutacion)
+        aproximateTimeout = firstTimeoutMeasure * 1.5
+        # Timeout pasa a ser esta medida x 1,5 (flucutacion)
         
+        # Stop and wait
         for i in datagrams:
             # enviar datagrama i
-            socket.send(i.encode()) # O slef.send()?
-            #esperar ack
-            ack = self.socket.recv(len(ACK()))  # Wait to  an ACK from the server
-                # ! Reeler enunciado si es stop-and-wait o todo de un saque con hilos 
+            socket.send(bytes(i))
+            
+            socket.settimeout(aproximateTimeout)
+            try:
+                ack = socket.recv(ctypes.sizeof(Datagram))
+            except socket.timeout:
+                print("Tiempo de espera excedido, no se recibió ACK.")
+
         
         # TODO: MANEJO DE ERRORES Y TIMEOUTS
-        # TODO: Como definir el timeout? -> 1.5 * RTT (1.5 puede variar) * tamaño(paquete)/tamaño(header)        
+        # TODO: Como definir el timeout? -> 1.5 * RTT (1.5 puede variar)         
         
 #        
 #    def download(self, document_name):
-#        Enviar al servidor solicitud de descarga
+#        Enviar al servidor solicitud de descarga como un header
 #            # TODO Implementar mensaje de solicitud de descarga
 #        Esperar ACK del servidor
-#            # TODO Implementar ACK del servidor 
-#            # ? mismo que header que antes?
+#            # TODO Implementar ACK del servidor por si o por no (que traiga -1 de numero?)
+#        
 #        
 #        for i in cantidad:
 #            esperar datagrama i

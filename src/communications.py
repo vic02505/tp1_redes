@@ -1,88 +1,58 @@
-class Datagram:
-    def __init__(self, num, total, size, data):
-        self.num = num
-        self.total = total
-        self.size = size
-        self.data = data
+import ctypes
+from enum import Enum
 
-    @classmethod
-    def builder(cls):
-        return cls.DatagramBuilder()
+N = 256
 
-    class DatagramBuilder:
-        def __init__(self):
-            self._num = 0
-            self._total = 0
-            self._size = 0
-            self._data = bytearray(4000)
+class MessageType(Enum):
+    ACK = 1
+    HEADER_DOWNLOAD = 2
+    HEADER_UPLOAD = 3
+    CONTENT = 4
 
-        def num(self, num):
-            self._num = num
-            return self
+class Datagram(ctypes.LittleEndianStructure):
+    _fields_ = [
+        ("file_type", ctypes.c_uint8),  
+        ("file_name", ctypes.c_char * 100),  
+        ("file_size", ctypes.c_uint32),  
+        ("packet_number", ctypes.c_uint32),  
+        ("total_packet_count", ctypes.c_uint32),  
+        ("packet_size", ctypes.c_uint32),  
+        ("content", ctypes.c_char * 40000)  
+    ]
 
-        def total(self, total):
-            self._total = total
-            return self
-
-        def size(self, size):
-            self._size = size
-            return self
-
-        def data(self, data):
-            if len(data) != 4000:
-                raise ValueError("Data must be a bytearray of 4000 bytes")
-            self._data = data
-            return self
-
-        def build(self):
-            return Datagram(self._num, self._total, self._size, self._data)
-        
-class Header:
-    def __init__(self, file_name, file_size, packet_count):
-        self.file_name = file_name
+    def __init__(self, file_type, file_name="None", file_size=0, 
+                 packet_number=0, total_packet_count=0, 
+                 packet_size=0, content=""):
+        super().__init__()
+        self.file_type = file_type
+        self.file_name = file_name.encode('utf-8')[:100].ljust(100, b'\x00')  # Rellenar con ceros si es más corto
         self.file_size = file_size
-        self.packet_count = packet_count
+        self.packet_number = packet_number
+        self.total_packet_count = total_packet_count
+        self.packet_size = packet_size
+        self.content = content.encode('utf-8')[:40000].ljust(40000, b'\x00')  # Rellenar con ceros si es más corto
 
     @classmethod
-    def builder(cls):
-        return cls.HeaderBuilder()
-
-    class HeaderBuilder:
-        def __init__(self):
-            self._file_name = ""
-            self._file_size = 0
-            self._packet_count = 0
-
-        def file_name(self, file_name):
-            self._file_name = file_name
-            return self
-
-        def file_size(self, file_size):
-            self._file_size = file_size
-            return self
-
-        def packet_count(self, packet_count):
-            self._packet_count = packet_count
-            return self
-
-        def build(self):
-            return Header(self._file_name, self._file_size, self._packet_count)
-        
-class ACK:
-    def __init__(self, id):
-        self.id = id
+    def create_ack(cls, packet_number):
+        return cls(file_type=MessageType.ACK, packet_number=packet_number)
 
     @classmethod
-    def builder(cls):
-        return cls.ACKBuilder()
+    def create_download_header(cls, file_name, file_size):
+        return cls(file_type=MessageType.HEADER_DOWNLOAD, 
+                    file_name=file_name, 
+                    file_size=file_size)
+    
+    @classmethod
+    def create_upload_header(cls, file_name, file_size):
+        return cls(file_type=MessageType.HEADER_UPLOAD, 
+                    file_name=file_name, 
+                    file_size=file_size)
 
-    class ACKBuilder:
-        def __init__(self):
-            self._id = 0
-
-        def id(self, id):
-            self._id = id
-            return self
-
-        def build(self):
-            return ACK(self._id)
+    @classmethod
+    def create_content(cls, packet_number, total_packet_count, 
+                        packet_size, content):
+        return cls(file_type=MessageType.CONTENT, 
+                    packet_number=packet_number, 
+                    total_packet_count=total_packet_count, 
+                    packet_size=packet_size, 
+                    content=content)
