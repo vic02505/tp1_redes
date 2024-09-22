@@ -17,7 +17,7 @@ class Datagram(ctypes.LittleEndianStructure):
         ("packet_number", ctypes.c_uint32),  
         ("total_packet_count", ctypes.c_uint32),  
         ("packet_size", ctypes.c_uint32),  
-        ("content", ctypes.c_char * 40000)  
+        ("content", ctypes.c_char * 40000)
     ]
 
     def __init__(self, file_type, file_name="None", file_size=0, 

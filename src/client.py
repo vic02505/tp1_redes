@@ -5,33 +5,33 @@ import time
 from communications import Datagram, MessageType
 
 
-FRAGMENT_SIZE = 1024
+FRAGMENT_SIZE = 40000
 
 class Client:
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
+    def __init__(self):
+        # self.host = host
+        # self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.connect((self.host, self.port))
+        # self.socket.connect((self.host, self.port))
 
-    def connect(self):
-        self.socket.connect((self.host, self.port))
-        # Esperar ACK del servidor
-        self.socket.recv(1024)
-        # TODO: Implementar los mensajes en conjunto de comunicacion cliente-servidor 
+    # def connect(self):
+    #     self.socket.connect((self.host, self.port))
+    #     # Esperar ACK del servidor
+    #     self.socket.recv(1024)
+    #     # TODO: Implementar los mensajes en conjunto de comunicacion cliente-servidor 
         
     def upload(self, document_name):
-        
-        # Enviar mensaje de upload a Servidor y espera ACK
-        self.socket.send(b'upload')
-        self.socket.recv(1024)
-                
         # Abrir el archivo y leer su contenido
+
+        # Dirección y puerto del servidor
+        server_address = ('localhost', 1234)
+
         with open(document_name, 'rb') as file:
             file_contents = file.read()
-        
-        # Now you can examine the contents of the file
-        print(file_contents)
+
+        # # Enviar mensaje de upload a Servidor y espera ACK
+        # self.socket.send(Datagram.create_upload_header(document_name, len(file_contents)))
+        # self.socket.recv(len(Datagram)) # ACK
         
         # Cantidad de fragmentos
         fragment_count = math.ceil(len(file_contents) / FRAGMENT_SIZE) 
@@ -50,7 +50,7 @@ class Client:
         # enviar a server primera comunicacion de va archivo con x tamaño
         header = Datagram.create_download_header(document_name, len(file_contents), fragment_count)
         sendTime = time.time()
-        self.socket.send(header.encode())  # Send the header to the server
+        self.socket.sendto(header.encode(), server_address)  # Send the header to the server
         
         # esperar ack
         ack = self.socket.recv(len(Datagram))  # Wait to  an ACK from the server
@@ -70,7 +70,7 @@ class Client:
         # Stop and wait
         for i in datagrams:
             # enviar datagrama i
-            socket.send(bytes(i))
+            socket.sendto(bytes(i), server_address)
             
             socket.settimeout(aproximateTimeout)
             try:

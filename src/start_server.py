@@ -1,6 +1,6 @@
 #crear main para iniciar el servidor
 from sys import argv
-from src.lib.server import Server
+from lib.server import Server
 
 if __name__ == '__main__':
 

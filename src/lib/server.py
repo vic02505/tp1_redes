@@ -1,6 +1,8 @@
 import queue
 import socket
 import threading
+from communications import Datagram, MessageType
+
 
 class Server:
     def __init__(self, host, port):
@@ -25,7 +27,7 @@ class Server:
             try:
                 print(f"[SERVIDOR - Hilo principal] Esperando mensajes")
                 data, client_address = self.socket.recvfrom(1024)
-                operation = data.operation
+                # operation = data.operation
                 print(f"[SERVIDOR - Hilo principal] Informacion recibida {client_address}: {data.decode()}")
 
                 if client_address not in self.clients:
@@ -34,8 +36,8 @@ class Server:
                     self.queues[client_address] = new_client_queue
 
                     #Add the client to the list of clients.
-                    #new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue, self.protocol, operation))
-                    new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue))
+                    new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue, "Stop and Wait", "upload"))
+                    #new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue))
                     self.clients[client_address] = new_client_thread
                     new_client_thread.start()
 
@@ -55,14 +57,14 @@ def client_thread(address, client_queue, protocol, operation):
 def stop_wait_receive(client_queue, address, socket_client):
     paquet_number = 0
     paquet_total_size = 0
-    while paquet_number < paquet_total_size:
+    while True:
         # Esperar paquete
         message = client_queue.get()
         # guardo paquete
         # message.save()
         paquet_number += 1
         # envio ack
-        socket_client.sendto(message, address)
+        socket_client.sendto(Datagram.create_ack(), address)
 
 def stop_wait_send(client_queue, address, socket_client):
     paquet_number = 0
