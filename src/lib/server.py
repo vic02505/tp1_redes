@@ -1,7 +1,9 @@
 import queue
 import socket
 import threading
-from communications import Datagram, MessageType
+from communications import Datagram, TypeOfDatagram
+
+from src.communications import DatagramDeserialized
 
 
 class Server:
@@ -26,9 +28,8 @@ class Server:
         while True:
             try:
                 print(f"[SERVIDOR - Hilo principal] Esperando mensajes")
-                data, client_address = self.socket.recvfrom(1024)
-                # operation = data.operation
-                print(f"[SERVIDOR - Hilo principal] Informacion recibida {client_address}: {data.decode()}")
+                data, client_address = self.socket.recvfrom(40117)
+
 
                 if client_address not in self.clients:
                     new_client_queue = queue.Queue()
@@ -36,23 +37,33 @@ class Server:
                     self.queues[client_address] = new_client_queue
 
                     #Add the client to the list of clients.
-                    new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue, "Stop and Wait", "upload"))
+                    new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue))
                     #new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue))
                     self.clients[client_address] = new_client_thread
                     new_client_thread.start()
 
-                self.queues[client_address].put(data)
+                    self.queues[client_address].put(data)
 
             except Exception as e:
                 print(e)
 
 def client_thread(address, client_queue, protocol, operation):
-    print(f"[SERVIDOR - Hilo #{address}]Comienza a correr el thread del cliente")
+    print(f"[SERVIDOR - Hilo #{address}] Comienza a correr el thread del cliente")
     socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    data = client_queue.get()
+    deserliazed_data = DatagramDeserialized(data)
+
+    ACK_datagram = Datagram.create_ack(deserliazed_data.packet_number)
+    bytes = ACK_datagram.get_datagram_bytes()
+    socket_client.sendto(bytes, address)
+
+    '''
     if protocol == "Stop and Wait" and operation == "upload":
         stop_wait_receive(socket_client, address, client_queue)
     elif protocol == "Stop and Wait" and operation == "download":
         stop_wait_send(socket_client, address, client_queue)
+    '''
 
 def stop_wait_receive(client_queue, address, socket_client):
     paquet_number = 0

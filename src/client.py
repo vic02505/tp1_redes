@@ -2,27 +2,16 @@ import ctypes
 import socket
 import math
 import time
-from communications import Datagram, MessageType
+from communications import Datagram, TypeOfDatagram, DatagramDeserialized
 
 
 FRAGMENT_SIZE = 40000
 
 class Client:
     def __init__(self):
-        # self.host = host
-        # self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # self.socket.connect((self.host, self.port))
 
-    # def connect(self):
-    #     self.socket.connect((self.host, self.port))
-    #     # Esperar ACK del servidor
-    #     self.socket.recv(1024)
-    #     # TODO: Implementar los mensajes en conjunto de comunicacion cliente-servidor 
-        
     def upload(self, document_name):
-        # Abrir el archivo y leer su contenido
-
         # Dirección y puerto del servidor
         server_address = ('localhost', 1234)
 
@@ -32,33 +21,37 @@ class Client:
         # # Enviar mensaje de upload a Servidor y espera ACK
         # self.socket.send(Datagram.create_upload_header(document_name, len(file_contents)))
         # self.socket.recv(len(Datagram)) # ACK
-        
+
         # Cantidad de fragmentos
         fragment_count = math.ceil(len(file_contents) / FRAGMENT_SIZE) 
         datagrams = []
-        
+
         # Generamos los datagramas a enviar
-        for i in fragment_count:
+        for i in range(fragment_count):
             start = i * FRAGMENT_SIZE
             end = min(start + FRAGMENT_SIZE, len(file_contents))
             fragment = file_contents[start:end]
-            datagram = Datagram.create_content(i, fragment_count, len(fragment), fragment)
+            datagram = Datagram.create_content(packet_number=i, total_packet_count=fragment_count,
+                                               packet_size=len(fragment), content=fragment)
+
             datagrams.append(datagram)
         
         # Timeout muy grande y tomamos medida de este ack 
         
         # enviar a server primera comunicacion de va archivo con x tamaño
-        header = Datagram.create_download_header(document_name, len(file_contents), fragment_count)
+        header = Datagram.create_upload_header(document_name, len(file_contents), fragment_count)
         sendTime = time.time()
-        self.socket.sendto(header.encode(), server_address)  # Send the header to the server
+        baids = header.get_datagram_bytes()
+        self.socket.sendto(header.get_datagram_bytes(), server_address)  # Send the header to the server
         
         # esperar ack
-        ack = self.socket.recv(len(Datagram))  # Wait to  an ACK from the server
+        ack = self.socket.recv(40117)  # Wait to  an ACK from the server
         recvTime = time.time()
-        
-        rcvd: Datagram = ack.decode()
-        
-        if rcvd.total_packet_count != MessageType.ACK:
+        ack_deserilized = DatagramDeserialized(ack)
+        print(f"ACK recibido: {ack_deserilized.packet_number}")
+
+
+        if ack_deserilized.total_packet_count != TypeOfDatagram.ACK.value:
             print("Error en la comunicacion")
             return
         
@@ -70,11 +63,11 @@ class Client:
         # Stop and wait
         for i in datagrams:
             # enviar datagrama i
-            socket.sendto(bytes(i), server_address)
+            self.socket.sendto(bytes(i), server_address)
             
-            socket.settimeout(aproximateTimeout)
+            self.socket.settimeout(aproximateTimeout)
             try:
-                ack = socket.recv(ctypes.sizeof(Datagram))
+                ack = self.socket.recv(ctypes.sizeof(Datagram))
             except socket.timeout:
                 print("Tiempo de espera excedido, no se recibió ACK.")
 
