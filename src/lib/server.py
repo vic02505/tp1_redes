@@ -2,9 +2,7 @@ import queue
 import socket
 import threading
 import math
-from communications import Datagram, TypeOfDatagram, DatagramDeserialized, FRAGMENT_SIZE
-
-OK = 0
+from communications import Datagram, TypeOfDatagram, DatagramDeserialized, FRAGMENT_SIZE, DATAGRAM_SIZE
 
 class Server:
     def __init__(self, host, port):
@@ -14,7 +12,7 @@ class Server:
         self.clients = {}
         self.queues = {}
         self.running = True
-        self.protocolo = "Stop and Wait" or "Selective ACK"
+        self.protocolo = "Stop and Wait"
 
     def start(self):
         try:
@@ -28,63 +26,78 @@ class Server:
         while True:
             try:
                 print(f"[SERVIDOR - Hilo principal] Esperando mensajes")
-                data, client_address = self.socket.recvfrom(40117)
-                rcvd_header = DatagramDeserialized(data)
+
+                # En la espera de recibir un datagrama
+                datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
+
                 print(f"[SERVIDOR - Hilo principal] Recibio mensaje para: {client_address}")
 
                 if client_address not in self.clients:
+                    # Creamos la queue que el hilo del cliente va a utilizar
                     new_client_queue = queue.Queue()
+
                     # Agregar el thread del la conexion con el cliente al diccionario.
                     self.queues[client_address] = new_client_queue
 
                     #Add the client to the list of clients.
-                    new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue, rcvd_header))
-                    #new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue))
+                    datagram = DatagramDeserialized(datagram)
+                    datagram_type = datagram.datagram_type
+                    if datagram_type != TypeOfDatagram.HEADER_UPLOAD.value and datagram_type != TypeOfDatagram.HEADER_DOWNLOAD.value:
+                        raise Exception("El primer mensaje no es un header")
+                    
+                    total_datagrams = datagram.total_datagrams
+                    file_name = datagram.file_name
+                    if total_datagrams == 0:
+                        raise Exception("El total de datagramas es 0")
+
+                    new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue, self.protocolo, datagram_type, total_datagrams, file_name))
+                    
                     self.clients[client_address] = new_client_thread
                     
                     new_client_thread.start()
 
-                    # self.queues[client_address].put(data)
-
-                # Faltaba este else?
                 else:
-                    self.queues[client_address].put(data)
+                    self.queues[client_address].put(datagram)
 
             except Exception as e:
                 print(e)
 
-# def client_thread(address, client_queue, protocol, operation):
-#     print(f"[SERVIDOR - Hilo #{address}] Comienza a correr el thread del cliente")
-#     socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+def client_thread(address, client_queue, protocol, datagram_type, total_datagrams, file_name):
+    print(f"[SERVIDOR - Hilo #{address}] Comienza a correr el thread del cliente")
+    socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-#     data = client_queue.get()
-#     deserliazed_data = DatagramDeserialized(data)
+    # Envio ACK del HS_UPLOAD
+    ACK_datagram = Datagram.create_ack()
+    bytes = ACK_datagram.get_datagram_bytes()
+    socket_client.sendto(bytes, address)
 
-#     ACK_datagram = Datagram.create_ack(deserliazed_data.packet_number)
-#     bytes = ACK_datagram.get_datagram_bytes()
-#     socket_client.sendto(bytes, address)
+    if protocol == "Stop and Wait" and datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
+        stop_wait_receive(socket_client, address, client_queue, total_datagrams, file_name)
+    elif protocol == "Stop and Wait" and datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
+        stop_wait_send(socket_client, address, client_queue, total_datagrams, file_name)
 
-#     '''
-#     if protocol == "Stop and Wait" and operation == "upload":
-#         stop_wait_receive(socket_client, address, client_queue)
-#     elif protocol == "Stop and Wait" and operation == "download":
-#         stop_wait_send(socket_client, address, client_queue)
-#     '''
-
-
-def stop_wait_receive(client_queue, address, socket_client):
-    paquet_number = 0
-    paquet_total_size = 0
-    while True:
+def stop_wait_receive( socket_client, address, client_queue, total_datagrams, file_name):
+    received_data = []
+    print("Total de datagramas", total_datagrams)
+    for i in range(total_datagrams):
         # Esperar paquete
-        message = client_queue.get()
-        # guardo paquete
-        # message.save()
-        paquet_number += 1
-        # envio ack
-        socket_client.sendto(Datagram.create_ack(), address)
+        datagram = client_queue.get()
+        datagram = DatagramDeserialized(datagram)
 
-def stop_wait_send(client_queue, address, socket_client):
+        # Guardo paquete
+        received_data.append(datagram.content)
+
+        # Envio de ack
+        socket_client.sendto(Datagram.create_ack().get_datagram_bytes(), address)
+
+    # Unir todo el contenido de los datagramas
+    file = b''.join(received_data)
+
+    # Guardar el contenido en un archivo
+    with open(file_name, 'wb') as f:
+        f.write(file)
+
+def stop_wait_send(client_queue, address, socket_client, total_datagrams, file_name):
     paquet_number = 0
     paquet_total_size = 0
     while paquet_number < paquet_total_size:
@@ -94,39 +107,3 @@ def stop_wait_send(client_queue, address, socket_client):
         socket.sendto(message, address)
         # espero ack
         ack = client_queue.get()
-
-def client_thread(address, client_queue, rcvd_header):
-    print(f"[SERVIDOR - Hilo #{address}]Comienza a correr el thread del cliente")
-    
-    
-    
-    socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    ACK_datagram = Datagram.create_ack(OK)
-    bytes = ACK_datagram.get_datagram_bytes()
-    socket_client.sendto(bytes, address)
-
-    # El True tiene que ser remplazado por la cant de datagramas que se van a enviar en el header
-    i = 0
-    rcvd_bytes = b""
-    for i in range(math.ceil(rcvd_header.file_size / FRAGMENT_SIZE)):
-        # print(f"[SERVIDOR - Hilo #{address}] Esperando nuevo mensaje")
-        message = client_queue.get()
-        datagrama = DatagramDeserialized(message)
-        print(f"[SERVIDOR - Hilo #{address}] Mensaje recibido datagrama completo: {datagrama.file_name}")
-        print(f"[SERVIDOR - Hilo #{address}] Mensaje recibido datagrama completo: {datagrama.packet_size}")
-        rcvd_bytes += datagrama.content
-        ACK_datagram = Datagram.create_ack(datagrama.packet_number)
-        bytes = ACK_datagram.get_datagram_bytes()
-        socket_client.sendto(bytes, address)
-
-
-
-    file_name = "server_files" + datagrama.file_name
-    with open(file_name, 'wb') as file:
-        file.write(rcvd_bytes)
-        print(f"[SERVIDOR - Hilo #{address}] Archivo {datagrama.file_name} creado y guardado correctamente.")
-
-        # Envio ACK
-        # Proceso
-        # Envio data

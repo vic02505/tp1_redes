@@ -10,65 +10,58 @@ class TypeOfDatagram(Enum):
 
 N = 256
 FRAGMENT_SIZE = 40000
-
+DATAGRAM_SIZE = 40117
 class DatagramDeserialized:
 
     def __init__ (self, bytes_flow):
-        self.file_type = struct.unpack('<B', bytes_flow[0:1])[0]
+        self.datagram_type = struct.unpack('<B', bytes_flow[0:1])[0]
         self.file_name = bytes_flow[1:101].decode().rstrip('\x00')
         self.file_size = struct.unpack('<I', bytes_flow[101:105])[0]
-        self.packet_number = struct.unpack('<I', bytes_flow[105:109])[0]
-        self.total_packet_count = struct.unpack('<I', bytes_flow[109:113])[0]
-        self.packet_size = struct.unpack('<I', bytes_flow[113:117])[0]
+        self.datagram_number = struct.unpack('<I', bytes_flow[105:109])[0]
+        self.total_datagrams = struct.unpack('<I', bytes_flow[109:113])[0]
+        self.datagram_size = struct.unpack('<I', bytes_flow[113:117])[0]
         self.content = bytes_flow[117:40117]
-        self.content = self.content[:self.packet_size]
+        self.content = self.content[:self.datagram_size]
 
         #TODO: Porque falla el packjet size llega mal. Los campos llegan todos mal?
         
 
 
 class Datagram():
-    def __init__(self, file_type, file_name, file_size, packet_number, total_packet_count, packet_size, content):
-        # self.file_type = struct.pack('B', file_type)
-        # self.file_name = file_name.encode().ljust(100, b'0')
-        # self.file_size = struct.pack('I', file_size)
-        # self.packet_number = struct.pack('I', packet_number)
-        # self.total_packet_count = struct.pack('I', total_packet_count)
-        # self.packet_size = struct.pack('I', packet_size)
-        # self.content = content.ljust(40000, b'0')
-        self.file_type = file_type
-        self.file_name = file_name
-        self.file_size = file_size
-        self.packet_number = packet_number
-        self.total_packet_count = total_packet_count
-        self.packet_size = packet_size
-        self.content = content.ljust(40000, b'0')
+    def __init__(self, datagram_type, file_name, file_size, datagram_number, total_datagrams, datagram_size, content):
+        self.datagram_type = datagram_type  # Defino que tipo de mensaje es (ACK, HS_DOWNLOAD, HS_UPLOAD, CONTENT)
+        self.file_name = file_name  # Nombre del archivo para guardar en servidor o cliente
+        self.file_size = file_size  # Tamaño del archivo
+        self.datagram_number = datagram_number # Numero de paquete que estoy enviando 
+        self.total_datagrams = total_datagrams    # Cantidad total de paquetes que se enviaran o se recibiran
+        self.datagram_size = datagram_size  # Tamaño del paquete que se envia
+        self.content = content.ljust(40000, b'0') # Contenido del paquete
 
     def get_datagram_bytes(self):
         format = '<B100sIIII40000s'  
-        return struct.pack(format, self.file_type, self.file_name.encode('utf-8'), self.file_size, self.packet_number, self.total_packet_count, self.packet_size, self.content)
+        return struct.pack(format, self.datagram_type, self.file_name.encode('utf-8'), self.file_size, self.datagram_number, self.total_datagrams, self.datagram_size, self.content)
 
 
     @classmethod
-    def create_ack(cls, packet_number):
-        return cls(file_type=TypeOfDatagram.ACK.value, file_name="", file_size=0, packet_number=0,
-                   total_packet_count=0, packet_size=0, content=b"")
+    def create_ack(cls):
+        return cls(datagram_type=TypeOfDatagram.ACK.value, file_name="", file_size=0, datagram_number=0,
+                   total_datagrams=0, datagram_size=0, content=b"")
 
     @classmethod
     def create_download_header(cls, file_name, file_size):
-        return cls(file_type=TypeOfDatagram.HEADER_DOWNLOAD.value,
+        return cls(datagram_type=TypeOfDatagram.HEADER_DOWNLOAD.value,
                    file_name=file_name,
                    file_size=file_size)
 
     @classmethod
-    def create_upload_header(cls, file_name, file_size, fragment_count):
-        return cls(file_type=TypeOfDatagram.HEADER_UPLOAD.value, file_name=file_name, file_size=file_size,
-                   packet_number=0, total_packet_count=fragment_count, packet_size=0, content=b"")
+    def create_upload_header(cls, file_name, file_size, total_datagrams):
+        return cls(datagram_type=TypeOfDatagram.HEADER_UPLOAD.value, file_name=file_name, file_size=file_size,
+                   datagram_number=0, total_datagrams=total_datagrams, datagram_size=0, content=b"")
 
     @classmethod
-    def create_content(cls, packet_number, total_packet_count, file_name,
-                       packet_size, content):
-        return cls(file_type=TypeOfDatagram.CONTENT.value, file_name=file_name, file_size=0,
-                   packet_number=packet_number, total_packet_count=total_packet_count,
-                   packet_size=packet_size, content=content)
+    def create_content(cls, datagram_number, total_datagrams, file_name,
+                       datagram_size, content):
+        return cls(datagram_type=TypeOfDatagram.CONTENT.value, file_name=file_name, file_size=0,
+                   datagram_number=datagram_number, total_datagrams=total_datagrams,
+                   datagram_size=datagram_size, content=content)
 
