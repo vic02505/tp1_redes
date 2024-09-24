@@ -53,15 +53,15 @@ class StopAndWait:
 
     def start_client(self, filename, datagram_type):
         if datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
-
+            # TODO RECEPCION EFECTIVA DE ACK (TIMEOUT POR SI NO LO RECIBO, REENVIAR HEADER HASTA RECIBIR ACK
             file_size = os.path.getsize(filename)
             total_datagrams = self.get_count_of_datagrams(filename)
-
             upload_header = Datagram.create_upload_header(filename,file_size, total_datagrams)
             self.socket.sendto(upload_header.get_datagram_bytes(), self.address)
             datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
             self.send(filename)
         elif datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
+            # TODO RECEPCION EFECTIVA DE ACK (TIMEOUT POR SI NO LO RECIBO, REENVIAR HEADER HASTA RECIBIR ACK
             download_header = Datagram.create_download_header(filename)
             self.socket.sendto(download_header.get_datagram_bytes())
             datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
@@ -80,6 +80,9 @@ class StopAndWait:
 
 
     def receive(self, total_datagrams, file_name):
+
+        #TODO MANEJO DE ACK
+
         received_data = []
         for i in range(total_datagrams):
             # Esperar paquete
@@ -105,6 +108,9 @@ class StopAndWait:
             f.write(file)
 
     def send(self, file_name):
+
+        # TODO MANEJO DE ACK
+
         try:
             with open(file_name, "rb") as file:
                 file_contents = file.read()
