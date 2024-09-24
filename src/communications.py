@@ -9,18 +9,17 @@ class TypeOfDatagram(Enum):
     CONTENT = 4
 
 N = 256
-
+FRAGMENT_SIZE = 40000
 
 class DatagramDeserialized:
 
     def __init__ (self, bytes_flow):
-        self.file_type = struct.unpack('B', bytes_flow[0:1])[0]
-        self.file_name = bytes_flow[1:101].decode()
-        self.file_size = struct.unpack('I', bytes_flow[101:105])[0]
-        self.packet_number = struct.unpack('I', bytes_flow[105:109])[0]
-        self.total_packet_count = struct.unpack('I', bytes_flow[109:113])[0]
-        self.packet_size = struct.unpack('I', bytes_flow[113:117])[0]
-        print(f"Packet sixze: {self.packet_size}")
+        self.file_type = struct.unpack('<B', bytes_flow[0:1])[0]
+        self.file_name = bytes_flow[1:101].decode().rstrip('\x00')
+        self.file_size = struct.unpack('<I', bytes_flow[101:105])[0]
+        self.packet_number = struct.unpack('<I', bytes_flow[105:109])[0]
+        self.total_packet_count = struct.unpack('<I', bytes_flow[109:113])[0]
+        self.packet_size = struct.unpack('<I', bytes_flow[113:117])[0]
         self.content = bytes_flow[117:40117]
         self.content = self.content[:self.packet_size]
 
@@ -46,9 +45,8 @@ class Datagram():
         self.content = content.ljust(40000, b'0')
 
     def get_datagram_bytes(self):
-        format = 'B100sIIII40000s'
+        format = '<B100sIIII40000s'  
         return struct.pack(format, self.file_type, self.file_name.encode('utf-8'), self.file_size, self.packet_number, self.total_packet_count, self.packet_size, self.content)
-        
 
 
     @classmethod
@@ -68,9 +66,9 @@ class Datagram():
                    packet_number=0, total_packet_count=fragment_count, packet_size=0, content=b"")
 
     @classmethod
-    def create_content(cls, packet_number, total_packet_count,
+    def create_content(cls, packet_number, total_packet_count, file_name,
                        packet_size, content):
-        return cls(file_type=TypeOfDatagram.CONTENT.value, file_name='', file_size=0,
+        return cls(file_type=TypeOfDatagram.CONTENT.value, file_name=file_name, file_size=0,
                    packet_number=packet_number, total_packet_count=total_packet_count,
                    packet_size=packet_size, content=content)
 

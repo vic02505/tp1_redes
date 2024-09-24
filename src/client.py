@@ -2,10 +2,7 @@ import ctypes
 import socket
 import math
 import time
-from communications import Datagram, TypeOfDatagram, DatagramDeserialized
-
-
-FRAGMENT_SIZE = 40000
+from communications import Datagram, TypeOfDatagram, DatagramDeserialized, FRAGMENT_SIZE
 
 class Client:
     def __init__(self):
@@ -31,7 +28,7 @@ class Client:
             start = i * FRAGMENT_SIZE
             end = min(start + FRAGMENT_SIZE, len(file_contents))
             fragment = file_contents[start:end]
-            datagram = Datagram.create_content(packet_number=i, total_packet_count=fragment_count,
+            datagram = Datagram.create_content(packet_number=i, total_packet_count=fragment_count, file_name=document_name,
                                                packet_size=end-start, content=fragment)
 
             datagrams.append(datagram)
@@ -55,7 +52,7 @@ class Client:
         
         firstTimeoutMeasure = recvTime - sendTime
         
-        aproximateTimeout = firstTimeoutMeasure * 1.5
+        aproximateTimeout = firstTimeoutMeasure * 3.5
         # Timeout pasa a ser esta medida x 1,5 (flucutacion)
         
         # Stop and wait

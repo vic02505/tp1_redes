@@ -1,7 +1,8 @@
 import queue
 import socket
 import threading
-from communications import Datagram, TypeOfDatagram, DatagramDeserialized
+import math
+from communications import Datagram, TypeOfDatagram, DatagramDeserialized, FRAGMENT_SIZE
 
 OK = 0
 
@@ -107,21 +108,24 @@ def client_thread(address, client_queue, rcvd_header):
 
     # El True tiene que ser remplazado por la cant de datagramas que se van a enviar en el header
     i = 0
-
-    for i in range(10000):
+    rcvd_bytes = b""
+    for i in range(math.ceil(rcvd_header.file_size / FRAGMENT_SIZE)):
         # print(f"[SERVIDOR - Hilo #{address}] Esperando nuevo mensaje")
         message = client_queue.get()
         datagrama = DatagramDeserialized(message)
         print(f"[SERVIDOR - Hilo #{address}] Mensaje recibido datagrama completo: {datagrama.file_name}")
         print(f"[SERVIDOR - Hilo #{address}] Mensaje recibido datagrama completo: {datagrama.packet_size}")
-        
+        rcvd_bytes += datagrama.content
         ACK_datagram = Datagram.create_ack(datagrama.packet_number)
         bytes = ACK_datagram.get_datagram_bytes()
         socket_client.sendto(bytes, address)
 
-        # with open(datagrama.file_name, 'wb') as file:
-        #     file.write(datagrama.content)
-        #     print(f"[SERVIDOR - Hilo #{address}] Archivo {datagrama.file_name} guardado correctamente.")
+
+
+    file_name = "server_files" + datagrama.file_name
+    with open(file_name, 'wb') as file:
+        file.write(rcvd_bytes)
+        print(f"[SERVIDOR - Hilo #{address}] Archivo {datagrama.file_name} creado y guardado correctamente.")
 
         # Envio ACK
         # Proceso
