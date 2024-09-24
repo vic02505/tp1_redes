@@ -1,6 +1,7 @@
 import struct
 from enum import Enum
 
+
 class TypeOfDatagram(Enum):
     ACK = 1
     HEADER_DOWNLOAD = 2
@@ -47,10 +48,9 @@ class Datagram():
                    total_datagrams=0, datagram_size=0, content=b"")
 
     @classmethod
-    def create_download_header(cls, file_name, file_size):
-        return cls(datagram_type=TypeOfDatagram.HEADER_DOWNLOAD.value,
-                   file_name=file_name,
-                   file_size=file_size)
+    def create_download_header(cls, file_name):
+        return cls(datagram_type=TypeOfDatagram.HEADER_DOWNLOAD.value, file_name=file_name, file_size=0,
+                   datagram_number=0, total_datagrams=0, datagram_size=0, content=b"")
 
     @classmethod
     def create_upload_header(cls, file_name, file_size, total_datagrams):

@@ -1,7 +1,9 @@
 import queue
 import socket
 import threading
-from lib.communications import Datagram, TypeOfDatagram, DatagramDeserialized, DATAGRAM_SIZE
+from lib.communications import Datagram, TypeOfDatagram, DatagramDeserialized, DATAGRAM_SIZE, FRAGMENT_SIZE
+import math
+import os
 
 class Server:
     def __init__(self, host, port):
@@ -46,8 +48,6 @@ class Server:
                     
                     total_datagrams = datagram.total_datagrams
                     file_name = datagram.file_name
-                    if total_datagrams == 0:
-                        raise Exception("El total de datagramas es 0")
 
                     new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue, self.protocolo, datagram_type, total_datagrams, file_name))
                     
@@ -65,17 +65,17 @@ def client_thread(address, client_queue, protocol, datagram_type, total_datagram
     print(f"[SERVIDOR - Hilo #{address}] Comienza a correr el thread del cliente")
     socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    # Envio ACK del HS_UPLOAD
-    ACK_datagram = Datagram.create_ack()
-    bytes = ACK_datagram.get_datagram_bytes()
-    socket_client.sendto(bytes, address)
-
     if protocol == "Stop and Wait" and datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
         stop_wait_receive(socket_client, address, client_queue, total_datagrams, file_name)
     elif protocol == "Stop and Wait" and datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
         stop_wait_send(socket_client, address, client_queue, total_datagrams, file_name)
 
 def stop_wait_receive( socket_client, address, client_queue, total_datagrams, file_name):
+    # Envio ACK del HS_UPLOAD
+    ACK_datagram = Datagram.create_ack()
+    bytes = ACK_datagram.get_datagram_bytes()
+    socket_client.sendto(bytes, address)
+
     received_data = []
     print("Total de datagramas", total_datagrams)
     for i in range(total_datagrams):
@@ -92,17 +92,52 @@ def stop_wait_receive( socket_client, address, client_queue, total_datagrams, fi
     # Unir todo el contenido de los datagramas
     file = b''.join(received_data)
 
+    # Asegúrate de que el directorio 'server_files' exista
+    os.makedirs(os.path.dirname('server_files/' + file_name), exist_ok=True)
+
     # Guardar el contenido en un archivo
-    with open(file_name, 'wb') as f:
+    with open('server_files/' + file_name, 'wb') as f:
         f.write(file)
 
-def stop_wait_send(client_queue, address, socket_client, total_datagrams, file_name):
-    paquet_number = 0
-    paquet_total_size = 0
-    while paquet_number < paquet_total_size:
-        # saco paquete
-        message = "Saco paquete"
-        # envio paquete
-        socket.sendto(message, address)
-        # espero ack
-        ack = client_queue.get()
+def stop_wait_send(socket_client, address, client_queue, total_datagrams, file_name):
+    with open('server_files/'+file_name, "rb") as file:
+            file_contents = file.read()
+    print(f"Tamaño del file: {len(file_contents)} ")
+
+    # Cantidad de fragmentos
+    total_datagrams = math.ceil(len(file_contents) / FRAGMENT_SIZE)
+    datagrams = []
+
+    # Generamos los datagramas a enviar
+    for i in range(total_datagrams):
+        start = i * FRAGMENT_SIZE
+        end = min(start + FRAGMENT_SIZE, len(file_contents))
+        fragment = file_contents[start:end]
+        datagram = Datagram.create_content(
+            datagram_number=i,
+            total_datagrams=total_datagrams,
+            file_name=file_name,
+            datagram_size=end - start,
+            content=fragment,
+        )
+
+        datagrams.append(datagram)
+
+        # Envio ACK del HS_UPLOAD
+    ACK_datagram = Datagram.create_ack()
+    ACK_datagram.total_datagrams = total_datagrams
+    bytes = ACK_datagram.get_datagram_bytes()
+    socket_client.sendto(bytes, address)
+
+    # Stop and wait
+    for i in datagrams:
+        print(f"Enviando fragmento {i.datagram_number} de {i.total_datagrams}")
+
+        # Enviar datagrama i
+        socket_client.sendto(i.get_datagram_bytes(), address)
+
+        datagram = client_queue.get()
+        datagram = DatagramDeserialized(datagram)
+        if datagram.datagram_type != TypeOfDatagram.ACK.value:
+            print("Error en la comunicacion")
+            return
