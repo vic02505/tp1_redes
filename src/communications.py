@@ -20,22 +20,36 @@ class DatagramDeserialized:
         self.packet_number = struct.unpack('I', bytes_flow[105:109])[0]
         self.total_packet_count = struct.unpack('I', bytes_flow[109:113])[0]
         self.packet_size = struct.unpack('I', bytes_flow[113:117])[0]
+        print(f"Packet sixze: {self.packet_size}")
         self.content = bytes_flow[117:40117]
+        self.content = self.content[:self.packet_size]
+
+        #TODO: Porque falla el packjet size llega mal. Los campos llegan todos mal?
+        
 
 
 class Datagram():
     def __init__(self, file_type, file_name, file_size, packet_number, total_packet_count, packet_size, content):
-        self.file_type = struct.pack('B', file_type)
-        self.file_name = file_name.encode().ljust(100, b'0')
-        self.file_size = struct.pack('I', file_size)
-        self.packet_number = struct.pack('I', packet_number)
-        self.total_packet_count = struct.pack('I', total_packet_count)
-        self.packet_size = struct.pack('I', packet_size)
+        # self.file_type = struct.pack('B', file_type)
+        # self.file_name = file_name.encode().ljust(100, b'0')
+        # self.file_size = struct.pack('I', file_size)
+        # self.packet_number = struct.pack('I', packet_number)
+        # self.total_packet_count = struct.pack('I', total_packet_count)
+        # self.packet_size = struct.pack('I', packet_size)
+        # self.content = content.ljust(40000, b'0')
+        self.file_type = file_type
+        self.file_name = file_name
+        self.file_size = file_size
+        self.packet_number = packet_number
+        self.total_packet_count = total_packet_count
+        self.packet_size = packet_size
         self.content = content.ljust(40000, b'0')
 
     def get_datagram_bytes(self):
-        return (self.file_type + self.file_name + self.file_size + self.packet_number + self.total_packet_count
-                + self.packet_size + self.content)
+        format = 'B100sIIII40000s'
+        return struct.pack(format, self.file_type, self.file_name.encode('utf-8'), self.file_size, self.packet_number, self.total_packet_count, self.packet_size, self.content)
+        
+
 
     @classmethod
     def create_ack(cls, packet_number):

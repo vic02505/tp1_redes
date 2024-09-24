@@ -17,7 +17,7 @@ class Client:
 
         with open(document_name, 'rb') as file:
             file_contents = file.read()
-
+        print(f"Tamaño del file: {len(file_contents)} ")
         # # Enviar mensaje de upload a Servidor y espera ACK
         # self.socket.send(Datagram.create_upload_header(document_name, len(file_contents)))
         # self.socket.recv(len(Datagram)) # ACK
@@ -32,7 +32,7 @@ class Client:
             end = min(start + FRAGMENT_SIZE, len(file_contents))
             fragment = file_contents[start:end]
             datagram = Datagram.create_content(packet_number=i, total_packet_count=fragment_count,
-                                               packet_size=len(fragment), content=fragment)
+                                               packet_size=end-start, content=fragment)
 
             datagrams.append(datagram)
         
@@ -41,19 +41,17 @@ class Client:
         # enviar a server primera comunicacion de va archivo con x tamaño
         header = Datagram.create_upload_header(document_name, len(file_contents), fragment_count)
         sendTime = time.time()
-        baids = header.get_datagram_bytes()
         self.socket.sendto(header.get_datagram_bytes(), server_address)  # Send the header to the server
         
         # esperar ack
         ack = self.socket.recv(40117)  # Wait to  an ACK from the server
         recvTime = time.time()
         ack_deserilized = DatagramDeserialized(ack)
-        print(f"ACK recibido: {ack_deserilized.packet_number}")
-
-
-        if ack_deserilized.total_packet_count != TypeOfDatagram.ACK.value:
+        if ack_deserilized.file_type != TypeOfDatagram.ACK.value:
             print("Error en la comunicacion")
             return
+        
+        print(f"ACK de conexion(header) recibido en {recvTime - sendTime} segundos")
         
         firstTimeoutMeasure = recvTime - sendTime
         
@@ -62,18 +60,18 @@ class Client:
         
         # Stop and wait
         for i in datagrams:
+            print(f"Enviando fragmento {i.packet_number} de {i.total_packet_count}")
             # enviar datagrama i
-            self.socket.sendto(bytes(i), server_address)
+            self.socket.sendto(i.get_datagram_bytes() , server_address)
             
             self.socket.settimeout(aproximateTimeout)
             try:
-                ack = self.socket.recv(ctypes.sizeof(Datagram))
+                ack = self.socket.recv(40117)
             except socket.timeout:
                 print("Tiempo de espera excedido, no se recibió ACK.")
 
-        
-        # TODO: MANEJO DE ERRORES Y TIMEOUTS
-        # TODO: Como definir el timeout? -> 1.5 * RTT (1.5 puede variar)         
+        print("Archivo enviado correctamente")
+        # TODO: MANEJO DE ERRORES
         
 #        
 #    def download(self, document_name):
@@ -90,12 +88,6 @@ class Client:
 #        
 #        llega todo reconstruir archivo
 #        guardar archivo en disco (?)
-    
-   
-    def send(self, message):
-        self.socket.sendto(message.encode('utf-8'), (self.host, self.port))
-        data, address = self.socket.recvfrom(1024)
-        print(f"Received data from {address}: {data.decode()}")
 
     def close(self):
         self.socket.close()
