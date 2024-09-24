@@ -1,6 +1,6 @@
 #crear main para iniciar el servidor
 from sys import argv
-from client import Client
+from lib.client import Client
 
 if __name__ == '__main__':
     if len(argv) < 2:

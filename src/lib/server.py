@@ -1,8 +1,7 @@
 import queue
 import socket
 import threading
-import math
-from communications import Datagram, TypeOfDatagram, DatagramDeserialized, FRAGMENT_SIZE, DATAGRAM_SIZE
+from lib.communications import Datagram, TypeOfDatagram, DatagramDeserialized, DATAGRAM_SIZE
 
 class Server:
     def __init__(self, host, port):

@@ -1,8 +1,7 @@
-import ctypes
 import socket
 import math
 import time
-from communications import Datagram, TypeOfDatagram, DatagramDeserialized, FRAGMENT_SIZE, DATAGRAM_SIZE
+from lib.communications import Datagram, TypeOfDatagram, DatagramDeserialized, FRAGMENT_SIZE, DATAGRAM_SIZE
 
 class Client:
     def __init__(self):
