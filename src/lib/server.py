@@ -4,6 +4,7 @@ import threading
 from lib.communications import Datagram, TypeOfDatagram, DatagramDeserialized, DATAGRAM_SIZE, FRAGMENT_SIZE
 import math
 import os
+from stop_and_wait import StopAndWait
 
 class Server:
     def __init__(self, host, port):
@@ -49,7 +50,7 @@ class Server:
                     total_datagrams = datagram.total_datagrams
                     file_name = datagram.file_name
 
-                    new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue, self.protocolo, datagram_type, total_datagrams, file_name))
+                    new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue))
                     
                     self.clients[client_address] = new_client_thread
                     
@@ -61,83 +62,7 @@ class Server:
             except Exception as e:
                 print(e)
 
-def client_thread(address, client_queue, protocol, datagram_type, total_datagrams, file_name):
+def client_thread(address, client_queue):
     print(f"[SERVIDOR - Hilo #{address}] Comienza a correr el thread del cliente")
     socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    if protocol == "Stop and Wait" and datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
-        stop_wait_receive(socket_client, address, client_queue, total_datagrams, file_name)
-    elif protocol == "Stop and Wait" and datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
-        stop_wait_send(socket_client, address, client_queue, total_datagrams, file_name)
-
-def stop_wait_receive( socket_client, address, client_queue, total_datagrams, file_name):
-    # Envio ACK del HS_UPLOAD
-    ACK_datagram = Datagram.create_ack()
-    bytes = ACK_datagram.get_datagram_bytes()
-    socket_client.sendto(bytes, address)
-
-    received_data = []
-    print("Total de datagramas", total_datagrams)
-    for i in range(total_datagrams):
-        # Esperar paquete
-        datagram = client_queue.get()
-        datagram = DatagramDeserialized(datagram)
-
-        # Guardo paquete
-        received_data.append(datagram.content)
-
-        # Envio de ack
-        socket_client.sendto(Datagram.create_ack().get_datagram_bytes(), address)
-
-    # Unir todo el contenido de los datagramas
-    file = b''.join(received_data)
-
-    # Asegúrate de que el directorio 'server_files' exista
-    os.makedirs(os.path.dirname('server_files/' + file_name), exist_ok=True)
-
-    # Guardar el contenido en un archivo
-    with open('server_files/' + file_name, 'wb') as f:
-        f.write(file)
-
-def stop_wait_send(socket_client, address, client_queue, total_datagrams, file_name):
-    with open('server_files/'+file_name, "rb") as file:
-            file_contents = file.read()
-    print(f"Tamaño del file: {len(file_contents)} ")
-
-    # Cantidad de fragmentos
-    total_datagrams = math.ceil(len(file_contents) / FRAGMENT_SIZE)
-    datagrams = []
-
-    # Generamos los datagramas a enviar
-    for i in range(total_datagrams):
-        start = i * FRAGMENT_SIZE
-        end = min(start + FRAGMENT_SIZE, len(file_contents))
-        fragment = file_contents[start:end]
-        datagram = Datagram.create_content(
-            datagram_number=i,
-            total_datagrams=total_datagrams,
-            file_name=file_name,
-            datagram_size=end - start,
-            content=fragment,
-        )
-
-        datagrams.append(datagram)
-
-        # Envio ACK del HS_UPLOAD
-    ACK_datagram = Datagram.create_ack()
-    ACK_datagram.total_datagrams = total_datagrams
-    bytes = ACK_datagram.get_datagram_bytes()
-    socket_client.sendto(bytes, address)
-
-    # Stop and wait
-    for i in datagrams:
-        print(f"Enviando fragmento {i.datagram_number} de {i.total_datagrams}")
-
-        # Enviar datagrama i
-        socket_client.sendto(i.get_datagram_bytes(), address)
-
-        datagram = client_queue.get()
-        datagram = DatagramDeserialized(datagram)
-        if datagram.datagram_type != TypeOfDatagram.ACK.value:
-            print("Error en la comunicacion")
-            return
+    StopAndWait(socket_client, address, client_queue).start()
