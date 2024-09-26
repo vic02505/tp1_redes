@@ -3,10 +3,11 @@ import queue
 from socket import socket
 from lib.communications import TypeOfDatagram, DatagramDeserialized, Datagram, FRAGMENT_SIZE, DATAGRAM_SIZE
 import os
+import time
 
 from pexpect import TIMEOUT
 
-TIMEOUT = 5
+TIMEOUT = 0.000000000000000000000000000000000000000000000005
 
 class StopAndWait:
     def __init__(self, socket, destination_address, messages_queue, is_server):
@@ -67,9 +68,16 @@ class StopAndWait:
             file_size = os.path.getsize(file_name)
             total_datagrams = self.get_count_of_datagrams(file_name)
             upload_header = Datagram.create_upload_header_client(file_name,file_size, total_datagrams)
+            sendTime = time.time()
             self.socket.sendto(upload_header.get_datagram_bytes(), self.address)
             datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
-            self.send(file_name)
+            recvTime = time.time()
+            print(f"Tiempo de envio de header: {recvTime - sendTime}")
+
+            firstTimeoutMeasure = recvTime - sendTime
+            aproximateTimeout = firstTimeoutMeasure * 0.00000000000000005 # Tiempo limite hasta que se considere que se perdio el paquete
+
+            self.send(file_name, aproximateTimeout)
         elif datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
             # TODO RECEPCION EFECTIVA DE ACK (TIMEOUT POR SI NO LO RECIBO, REENVIAR HEADER HASTA RECIBIR ACK
             download_header = Datagram.create_download_header_client(file_name)
@@ -123,7 +131,7 @@ class StopAndWait:
         with open('files/' + file_name, 'wb') as f:
             f.write(file)
 
-    def send(self, file_name):
+    def send(self, file_name, aproximateTimeout):
 
         try:
             with open(file_name, "rb") as file:
@@ -136,6 +144,8 @@ class StopAndWait:
         while datagrams_sent < len(datagrams):
             print(f"Enviando fragmento {datagrams[datagrams_sent].datagram_number} de {datagrams[datagrams_sent].total_datagrams}")
 
+
+            # self.socket.settimeout(aproximateTimeout)
             # Enviar datagrama i
             self.socket.sendto(datagrams[datagrams_sent].get_datagram_bytes(), self.address)
             ack_number_received = False
@@ -159,6 +169,7 @@ class StopAndWait:
                         if ack_number == datagrams_sent:
                             ack_number_received = True
                     except socket.timeout:
+                        print(f"Reenviando fragmento {datagrams[datagrams_sent].datagram_number} de {datagrams[datagrams_sent].total_datagrams}")
                         self.socket.sendto(datagrams[datagrams_sent].get_datagram_bytes(), self.address)
             datagrams_sent += 1
 
