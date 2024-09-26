@@ -1,7 +1,12 @@
 import math
-
+import queue
+from socket import socket
 from lib.communications import TypeOfDatagram, DatagramDeserialized, Datagram, FRAGMENT_SIZE, DATAGRAM_SIZE
 import os
+
+from pexpect import TIMEOUT
+
+TIMEOUT = 5
 
 class StopAndWait:
     def __init__(self, socket, destination_address, messages_queue, is_server):
@@ -9,6 +14,7 @@ class StopAndWait:
         self.address = destination_address
         self.queue = messages_queue
         self.is_server = is_server
+        self.socket.settimeout(TIMEOUT)
 
     @classmethod
     def create_stop_and_wait_for_server(cls,socket, destination_address, messages_queue):
@@ -76,27 +82,36 @@ class StopAndWait:
         else:
             raise Exception("El primer mensaje no es un header")
 
-    def send_ack(self, paquet_number):
-        ACK_datagram = Datagram.create_ack()
-        bytes = ACK_datagram.get_datagram_bytes()
+    def send_ack(self, ack_number):
+        ack_datagram = Datagram.create_ack(ack_number)
+        bytes = ack_datagram.get_datagram_bytes()
         self.socket.sendto(bytes, self.address)
 
 
     def receive(self, total_datagrams, file_name):
-        #TODO MANEJO DE ACK
         received_data = []
-        for i in range(total_datagrams):
-            # Esperar paquete
+        next_datagram_number = 0 # Numero de paquete que se espera recibir
+        print(total_datagrams)
+        while next_datagram_number < total_datagrams:
             if self.is_server:
                 deserialized_datagram = self.queue.get()
-            else:
-                datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE) # no recibe aca
-                deserialized_datagram = DatagramDeserialized(datagram)
+                datagram_number = deserialized_datagram.datagram_number
 
+            else:
+                datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
+                deserialized_datagram = DatagramDeserialized(datagram)
+                datagram_number = deserialized_datagram.datagram_number
+
+            # si recibo packete viejo es porque se perdio mi ack o tardo mucho en llegar
+            if datagram_number != next_datagram_number:
+                print(f"Reenviando ACK de paquete anterior numero", datagram_number)
+                self.send_ack(datagram_number - 1)
+                continue
             # Guardo paquete
             received_data.append(deserialized_datagram.content)
             # Envio de ack
-            self.send_ack(0)
+            self.send_ack(next_datagram_number)
+            next_datagram_number += 1
 
         # Unir todo el contenido de los datagramas
         file = b''.join(received_data)
@@ -110,8 +125,6 @@ class StopAndWait:
 
     def send(self, file_name):
 
-        # TODO MANEJO DE ACK
-
         try:
             with open(file_name, "rb") as file:
                 file_contents = file.read()
@@ -119,17 +132,35 @@ class StopAndWait:
             raise "Archivo no encontrado"
 
         datagrams = self.get_datagramas(file_contents)
-
-        # Stop and wait
-        for i in datagrams:
-            print(f"Enviando fragmento {i.datagram_number} de {i.total_datagrams}")
+        datagrams_sent = 0
+        while datagrams_sent < len(datagrams):
+            print(f"Enviando fragmento {datagrams[datagrams_sent].datagram_number} de {datagrams[datagrams_sent].total_datagrams}")
 
             # Enviar datagrama i
-            self.socket.sendto(i.get_datagram_bytes(), self.address)
-            if self.is_server:
-                datagram = self.queue.get()
-            else:
-                datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
+            self.socket.sendto(datagrams[datagrams_sent].get_datagram_bytes(), self.address)
+            ack_number_received = False
+            while not ack_number_received:
+                if self.is_server:
+                    # Esperar ack, si no recibo vuelvo a enviar datagrama
+                    try:
+                        deserialized_datagram = self.queue.get(timeout=TIMEOUT)
+                        ack_number = deserialized_datagram.datagram_number
+                        print(f"Recibido ack {ack_number}")
+                        if ack_number == datagrams_sent:
+                            ack_number_received = True
+                    except queue.Empty:
+                        print(f"Reenviando fragmento {datagrams[datagrams_sent].datagram_number} de {datagrams[datagrams_sent].total_datagrams}")
+                        self.socket.sendto(datagrams[datagrams_sent].get_datagram_bytes(), self.address)
+                else:
+                    try:
+                        datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
+                        deserialized_datagram = DatagramDeserialized(datagram)
+                        ack_number = deserialized_datagram.datagram_number
+                        if ack_number == datagrams_sent:
+                            ack_number_received = True
+                    except socket.timeout:
+                        self.socket.sendto(datagrams[datagrams_sent].get_datagram_bytes(), self.address)
+            datagrams_sent += 1
 
     def get_datagramas(self, file_contents):
         # Cantidad de fragmentos

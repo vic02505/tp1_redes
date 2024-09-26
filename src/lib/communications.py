@@ -43,8 +43,8 @@ class Datagram():
 
 
     @classmethod
-    def create_ack(cls):
-        return cls(datagram_type=TypeOfDatagram.ACK.value, file_name="", file_size=0, datagram_number=0,
+    def create_ack(cls, ack_number):
+        return cls(datagram_type=TypeOfDatagram.ACK.value, file_name="", file_size=0, datagram_number=ack_number,
                    total_datagrams=0, datagram_size=0, content=b"")
 
     @classmethod
