@@ -28,65 +28,61 @@ class StopAndWait:
 
             if deserialized_datagram.datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
                 self.send_ack(0)
-                filename = deserialized_datagram.file_name
+                file_name = deserialized_datagram.file_name
                 total_datagrams = deserialized_datagram.total_datagrams
-                print(f"[SERVIDOR - Hilo #{self.address}] Inicio de subida de archivo: {filename}")
-                self.receive(total_datagrams, filename)
+                print(f"[SERVIDOR - Hilo #{self.address}] Inicio de subida de archivo: {file_name}")
+                self.receive(total_datagrams, file_name)
             elif deserialized_datagram.datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
                 file_name = deserialized_datagram.file_name
                 file_size = os.path.getsize(file_name)
-                total_datagrams = math.ceil(file_size / FRAGMENT_SIZE)
-                ACK_datagram = Datagram.create_ack()
-                ACK_datagram.total_datagrams = total_datagrams
-                bytes = ACK_datagram.get_datagram_bytes()
-                self.socket.sendto(bytes, self.address)
+                total_datagrams = self.get_count_of_datagrams(file_name)
+                download_header = Datagram.create_download_header_server(file_name, file_size, total_datagrams)
+                self.socket.sendto(download_header.get_datagram_bytes(), self.address)
                 print(f"[SERVIDOR - Hilo #{self.address}] Inicio de descarga de archivo: {file_name}")
                 self.send(file_name)
             else:
                 raise Exception("El primer mensaje no es un header")
 
         except Exception as e:
-            raise(e)
+            raise e
 
-    def get_count_of_datagrams(self, filename):
+    def get_count_of_datagrams(self, file_name):
         try:
-            with open(filename, "rb") as file:
+            with open(file_name, "rb") as file:
                 file_contents = file.read()
         except:
             raise "Archivo no encontrado"
 
         return math.ceil(len(file_contents) / FRAGMENT_SIZE)
 
-    def start_client(self, filename, datagram_type):
+    def start_client(self, file_name, datagram_type):
         if datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
             # TODO RECEPCION EFECTIVA DE ACK (TIMEOUT POR SI NO LO RECIBO, REENVIAR HEADER HASTA RECIBIR ACK
-            file_size = os.path.getsize(filename)
-            total_datagrams = self.get_count_of_datagrams(filename)
-            upload_header = Datagram.create_upload_header(filename,file_size, total_datagrams)
+            file_size = os.path.getsize(file_name)
+            total_datagrams = self.get_count_of_datagrams(file_name)
+            upload_header = Datagram.create_upload_header_client(file_name,file_size, total_datagrams)
             self.socket.sendto(upload_header.get_datagram_bytes(), self.address)
             datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
-            self.send(filename)
+            self.send(file_name)
         elif datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
             # TODO RECEPCION EFECTIVA DE ACK (TIMEOUT POR SI NO LO RECIBO, REENVIAR HEADER HASTA RECIBIR ACK
-            download_header = Datagram.create_download_header(filename)
+            download_header = Datagram.create_download_header_client(file_name)
             self.socket.sendto(download_header.get_datagram_bytes(), self.address)
             datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
             deserialized_datagram = DatagramDeserialized(datagram)
             total_datagrams = deserialized_datagram.total_datagrams
             file_name = deserialized_datagram.file_name
-            self.receive(total_datagrams, filename)
+            self.receive(total_datagrams, file_name)
         else:
             raise Exception("El primer mensaje no es un header")
 
     def send_ack(self, paquet_number):
-        # Envio ACK del HS_UPLOAD
         ACK_datagram = Datagram.create_ack()
         bytes = ACK_datagram.get_datagram_bytes()
         self.socket.sendto(bytes, self.address)
 
 
     def receive(self, total_datagrams, file_name):
-        # Cliente recibe cant de datagramas?
         #TODO MANEJO DE ACK
         received_data = []
         for i in range(total_datagrams):
@@ -131,7 +127,7 @@ class StopAndWait:
             # Enviar datagrama i
             self.socket.sendto(i.get_datagram_bytes(), self.address)
             if self.is_server:
-                datagram = self.queue.get() ##aca queda
+                datagram = self.queue.get()
             else:
                 datagram, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
 

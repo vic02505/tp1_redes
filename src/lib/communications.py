@@ -48,12 +48,12 @@ class Datagram():
                    total_datagrams=0, datagram_size=0, content=b"")
 
     @classmethod
-    def create_download_header(cls, file_name):
+    def create_download_header_client(cls, file_name):
         return cls(datagram_type=TypeOfDatagram.HEADER_DOWNLOAD.value, file_name=file_name, file_size=0,
                    datagram_number=0, total_datagrams=0, datagram_size=0, content=b"")
 
     @classmethod
-    def create_upload_header(cls, file_name, file_size, total_datagrams):
+    def create_upload_header_client(cls, file_name, file_size, total_datagrams):
         return cls(datagram_type=TypeOfDatagram.HEADER_UPLOAD.value, file_name=file_name, file_size=file_size,
                    datagram_number=0, total_datagrams=total_datagrams, datagram_size=0, content=b"")
 
@@ -63,4 +63,9 @@ class Datagram():
         return cls(datagram_type=TypeOfDatagram.CONTENT.value, file_name=file_name, file_size=0,
                    datagram_number=datagram_number, total_datagrams=total_datagrams,
                    datagram_size=datagram_size, content=content)
+
+    @classmethod
+    def create_download_header_server(cls, file_name, file_size, total_datagrams):
+        return cls(datagram_type=TypeOfDatagram.HEADER_DOWNLOAD.value, file_name=file_name, file_size=file_size,
+                   datagram_number=0, total_datagrams=total_datagrams, datagram_size=0, content=b"")
 
