@@ -4,7 +4,7 @@ from socket import socket
 from lib.communications import TypeOfDatagram, DatagramDeserialized, Datagram, FRAGMENT_SIZE, DATAGRAM_SIZE
 import os
 import time
-import src.lib.files_management as files_management
+import lib.files_management as files_management
 
 TIMEOUT = 2
 
