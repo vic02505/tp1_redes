@@ -20,7 +20,9 @@ class Client:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def upload(self, file_name):
-        stop_and_wait = StopAndWait.create_stop_and_wait_for_client(self.socket, ("localhost", 1234))
+        print("Entro a upload")
+        #stop_and_wait = StopAndWait.create_stop_and_wait_for_client(self.socket, ("10.0.0.1", 1234))
+        stop_and_wait = StopAndWait.create_stop_and_wait_for_client(self.socket, ("127.0.0.1", 1234))
         stop_and_wait.start_client(file_name, TypeOfDatagram.HEADER_UPLOAD.value)
 
     def download(self, file_name):

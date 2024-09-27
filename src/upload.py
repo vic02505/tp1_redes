@@ -9,6 +9,7 @@ if __name__ == '__main__':
     
     try:
         file_name = argv[1]
+        print("Empezo upload")
         # server_port = int(argv[2])
         client = Client()
         # client.connect()
