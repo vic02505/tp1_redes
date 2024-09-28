@@ -38,10 +38,6 @@ class Server:
                     new_client_queue = queue.Queue()
                     self.queues[client_address] = new_client_queue
 
-                    if ((deserialized_datagram.datagram_type != TypeOfDatagram.HEADER_UPLOAD.value)
-                            and (deserialized_datagram.datagram_type != TypeOfDatagram.HEADER_DOWNLOAD.value)):
-                        raise Exception("El primer mensaje no es un header")
-
                     new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue))
                     
                     self.clients[client_address] = new_client_thread
