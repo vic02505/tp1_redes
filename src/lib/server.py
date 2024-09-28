@@ -25,13 +25,13 @@ class Server:
 
         while True:
             try:
-                print(f"[SERVIDOR - Hilo principal] Esperando mensajes")
+                # print(f"[SERVIDOR - Hilo principal] Esperando mensajes")
 
                 # En la espera de recibir un datagrama
                 bytes_flow, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
                 deserialized_datagram = DatagramDeserialized(bytes_flow)
 
-                print(f"[SERVIDOR - Hilo principal] Recibio mensaje para: {client_address}")
+                # print(f"[SERVIDOR - Hilo principal] Recibio mensaje para: {client_address}")
 
                 if client_address not in self.clients:
 

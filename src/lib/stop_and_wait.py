@@ -129,8 +129,7 @@ class StopAndWait:
 
         # Enviamos los datagramas
         for datagram in datagrams:
-            print(f"Enviando datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
-            print(f"BYTES: {sys.getsizeof(datagram.get_datagram_bytes())}")
+            print(f"[Cliente - {self.address}] Enviando datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
             self.socket.sendto(datagram.get_datagram_bytes(), self.address)
             self.wait_ack(datagram)
 
@@ -138,17 +137,14 @@ class StopAndWait:
         received_data = []
         for i in range(1, total_datagrams + 1):
             datagram_deserialized = self.queue.get()
-
             while i != datagram_deserialized.datagram_number:
-                print("Ya recibi este paquete")
-                print(datagram_deserialized.datagram_type)
+                print(f"[SERVIDOR - Hilo #{self.address}] Ya recibí este datagrama  {datagram_deserialized.datagram_number}")
                 self.send_ack(datagram_deserialized.datagram_number)
                 datagram_deserialized = self.queue.get()
-
             received_data.append(datagram_deserialized.content)
             self.send_ack(datagram_deserialized.datagram_number)
 
-        print("Creado con exito hijo de re mil puta")
+        print(f"[SERVIDOR - Hilo #{self.address}] Creado con éxito el archivo {file_name}")
         files_management.create_new_file(received_data, file_name)
 
     # Operaciones para el DOWNLOAD
@@ -157,13 +153,13 @@ class StopAndWait:
         for i in range(1, total_datagrams + 1):
             datagram_deserialized = DatagramDeserialized(self.socket.recv(DATAGRAM_SIZE))
             while i != datagram_deserialized.datagram_number:
-                print("Ya recibi este paquete")
+                print(f"[Cliente - {self.address}] Ya recibí este datagrama  {datagram_deserialized.datagram_number}")
                 self.send_ack(datagram_deserialized.datagram_number)
                 datagram_deserialized = DatagramDeserialized(self.socket.recv(DATAGRAM_SIZE))
             received_data.append(datagram_deserialized.content)
             self.send_ack(datagram_deserialized.datagram_number)
 
-        print("Creado con exito hijo de re mil puta")
+        print(f"[Cliente - {self.address}] Descarga realizada con éxito")
         files_management.create_new_file(received_data, file_name)
 
     def send_server_file(self, file_name):
@@ -178,6 +174,6 @@ class StopAndWait:
 
         # Enviamos los datagramas
         for datagram in datagrams:
-            print(f"Enviando datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
+            print(f"[SERVIDOR - Hilo #{self.address}] Datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
             self.socket.sendto(datagram.get_datagram_bytes(), self.address)
             self.wait_ack(datagram)
