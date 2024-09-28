@@ -61,7 +61,7 @@ class StopAndWait:
             # Armo el header UPLOAD
             file_size = files_management.get_file_size(file_name)
             total_datagrams = files_management.get_count_of_datagrams(file_name)
-            print(f"EL NUMERO DE DATAGRAMAS ES {total_datagrams}")
+            print(f"[Cliente - {self.address}] Se enviaran {total_datagrams} datagramas")
             upload_header = Datagram.create_upload_header_client(file_name, file_size, total_datagrams)
 
             # Envio el header
@@ -99,13 +99,13 @@ class StopAndWait:
                     ack, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
                     ack_deserialized = DatagramDeserialized(ack)
                 if ack_deserialized.datagram_number == datagram.datagram_number:
-                    print(f"[Cliente - {self.address}] Recibi ACK correcto")
+                    print(f"Recibi ACK correcto")
                     return ack_deserialized
             # Excepción por timeout
             except Exception:
-                print(f"[Cliente - {self.address}] Timeout alcanzado esperando ACK")
+                print(f"Timeout alcanzado esperando ACK")
                 self.socket.sendto(datagram.get_datagram_bytes(), self.address)
-                print(f"[Cliente - {self.address}] Datagrama enviado nuevamente")
+                print(f"Datagrama enviado nuevamente")
 
     # Send ack: envia un ack y espera que llegue un paquete distinto al ack_number
     def send_ack(self, ack_number):
@@ -128,7 +128,7 @@ class StopAndWait:
 
         # Enviamos los datagramas
         for datagram in datagrams:
-            print(f"Enviando datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
+            print(f"[Cliente - {self.address}] Enviando datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
             self.socket.sendto(datagram.get_datagram_bytes(), self.address)
             self.wait_ack(datagram)
 
@@ -137,13 +137,13 @@ class StopAndWait:
         for i in range(1, total_datagrams + 1):
             datagram_deserialized = self.queue.get()
             while i != datagram_deserialized.datagram_number:
-                print("Ya recibi este paquete")
+                print(f"[SERVIDOR - Hilo #{self.address}] Ya recibí este datagrama  {datagram_deserialized.datagram_number}")
                 self.send_ack(datagram_deserialized.datagram_number)
                 datagram_deserialized = self.queue.get()
             received_data.append(datagram_deserialized.content)
             self.send_ack(datagram_deserialized.datagram_number)
 
-        print("Creado con exito hijo de re mil puta")
+        print(f"[SERVIDOR - Hilo #{self.address}] Creado con éxito el archivo {file_name}")
         files_management.create_new_file(received_data, file_name)
 
     # Operaciones para el DOWNLOAD
@@ -152,13 +152,13 @@ class StopAndWait:
         for i in range(1, total_datagrams + 1):
             datagram_deserialized = DatagramDeserialized(self.socket.recv(DATAGRAM_SIZE))
             while i != datagram_deserialized.datagram_number:
-                print("Ya recibi este paquete")
+                print(f"[Cliente - {self.address}] Ya recibí este datagrama  {datagram_deserialized.datagram_number}")
                 self.send_ack(datagram_deserialized.datagram_number)
                 datagram_deserialized = DatagramDeserialized(self.socket.recv(DATAGRAM_SIZE))
             received_data.append(datagram_deserialized.content)
             self.send_ack(datagram_deserialized.datagram_number)
 
-        print("Creado con exito hijo de re mil puta")
+        print(f"[Cliente - {self.address}] Descarga realizada con éxito")
         files_management.create_new_file(received_data, file_name)
 
     def send_server_file(self, file_name):
@@ -173,6 +173,6 @@ class StopAndWait:
 
         # Enviamos los datagramas
         for datagram in datagrams:
-            print(f"Enviando datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
+            print(f"[SERVIDOR - Hilo #{self.address}] Datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
             self.socket.sendto(datagram.get_datagram_bytes(), self.address)
             self.wait_ack(datagram)
