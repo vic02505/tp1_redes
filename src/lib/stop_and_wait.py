@@ -1,11 +1,12 @@
 import math
 import queue
+import sys
 from socket import socket
 from lib.communications import TypeOfDatagram, DatagramDeserialized, Datagram, FRAGMENT_SIZE, DATAGRAM_SIZE
 import lib.files_management as files_management
 
-TIMEOUT_CLIENT = 5
-TIMEOUT_SERVER = 5
+TIMEOUT_CLIENT = 3
+TIMEOUT_SERVER = 3
 
 
 class StopAndWait:
@@ -129,6 +130,7 @@ class StopAndWait:
         # Enviamos los datagramas
         for datagram in datagrams:
             print(f"Enviando datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
+            print(f"BYTES: {sys.getsizeof(datagram.get_datagram_bytes())}")
             self.socket.sendto(datagram.get_datagram_bytes(), self.address)
             self.wait_ack(datagram)
 
@@ -136,10 +138,13 @@ class StopAndWait:
         received_data = []
         for i in range(1, total_datagrams + 1):
             datagram_deserialized = self.queue.get()
+
             while i != datagram_deserialized.datagram_number:
                 print("Ya recibi este paquete")
+                print(datagram_deserialized.datagram_type)
                 self.send_ack(datagram_deserialized.datagram_number)
                 datagram_deserialized = self.queue.get()
+
             received_data.append(datagram_deserialized.content)
             self.send_ack(datagram_deserialized.datagram_number)
 

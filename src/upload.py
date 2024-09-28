@@ -9,6 +9,7 @@ if __name__ == '__main__':
     
     try:
         file_name = argv[1]
+        print(f"{file_name}")
         client = Client()
         client.upload(file_name)
         client.close()
