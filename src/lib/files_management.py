@@ -1,8 +1,6 @@
 import math
 import os
-from lib.communications import Datagram
-
-FRAGMENT_SIZE = 118
+from lib.communications import Datagram, FRAGMENT_SIZE
 
 def get_count_of_datagrams(file_name):
     try:
