@@ -12,14 +12,21 @@
 ### Propuesta
     Hay 3 cosas a tener en cuenta principalmente: Manejo de timeouts, que no bloquee, solicitar paquetes a reenviar
     Manejo de Timeouts:
-        Cada vez que el cliente envia algo anota en un vector en la posicion del nuemro del paquete (TS, false). A su vez cada vez que repite el bucle revisa que no haya superado el TO y en caso de haberlo hecho reenvia. Cuando recibe un ack lo refleja cambiando el false a true para que ese TS sea ignorado en futuras revisiones. 
+        Cada vez que el cliente envia algo anota en un vector en la posicion del nuemro del paquete (TS, false). A su 
+        vez cada vez que repite el bucle revisa que no haya superado el TO y en caso de haberlo hecho reenvia. 
+        Cuando recibe un ack lo refleja cambiando el false a true para que ese TS sea ignorado en futuras revisiones. 
     Que no bloquee:
-        Esto aplica al cliente, usando socket.setblocking(false) hace que si no puede recibir lanze la excepcion, al catchearla continuamos el bucle y puede seguir enviando. El problema de esto es que el timeout del socket no es mas valido, pero el punto de arriba lo soluciona
+        Esto aplica al cliente, usando socket.setblocking(false) hace que si no puede recibir lanze la excepcion, 
+        al catchearla continuamos el bucle y puede seguir enviando. El problema de esto es que el timeout del socket 
+        no es mas valido, pero el punto de arriba lo soluciona
     Solicitar paquetes:
-        Esto aplica al server, que al ver que le llega el paquete 1 y 3 evidentemente nota que falta el 2. Ante la falta del 2 lo solicita enviando un ack al cliente con el numero -2. De esta manera el cliente al ver el negativo entiende que es una solicitud y el numero absoluto le da el valor de cual es el que debe reenviar. 
+        Esto aplica al server, que al ver que le llega el paquete 1 y 3 evidentemente nota que falta el 2. 
+        Ante la falta del 2 lo solicita enviando un ack al cliente con el numero -2. De esta manera el cliente al 
+        ver el negativo entiende que es una solicitud y el numero absoluto le da el valor de cual es el que debe reenviar. 
 
 ### Preparacion
-    Client: la preparacion es la misma, corta el archiov y envia un header de van a ser n cantidad de paquetes. Crea un vector de n (int, bool)
+    Client: la preparacion es la misma, corta el archiov y envia un header de van a ser n cantidad de paquetes. 
+    Crea un vector de n (int, bool)
     Server: Recibe el header y construye un vector de bytes del tamaño del payload de tamaño n
 ### Protocolo
     Client: Corre constantemente el siguiente while. Es FUNDAMENTAL setear socket.setblocink(False)
