@@ -5,8 +5,8 @@ from socket import socket
 from lib.communications import TypeOfDatagram, DatagramDeserialized, Datagram, FRAGMENT_SIZE, DATAGRAM_SIZE
 import lib.files_management as files_management
 
-TIMEOUT_CLIENT = 3
-TIMEOUT_SERVER = 3
+TIMEOUT_CLIENT = 0.5
+TIMEOUT_SERVER = 0.5
 
 
 class StopAndWait:

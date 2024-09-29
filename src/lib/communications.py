@@ -10,8 +10,8 @@ class TypeOfDatagram(Enum):
 
 
 N = 256
-FRAGMENT_SIZE = 1
-DATAGRAM_SIZE = 118
+FRAGMENT_SIZE = 1343
+DATAGRAM_SIZE = 1460
 
 
 class DatagramDeserialized:
@@ -23,7 +23,7 @@ class DatagramDeserialized:
         self.datagram_number = struct.unpack('<I', bytes_flow[105:109])[0]
         self.total_datagrams = struct.unpack('<I', bytes_flow[109:113])[0]
         self.datagram_size = struct.unpack('<I', bytes_flow[113:117])[0]
-        self.content = bytes_flow[117:118]
+        self.content = bytes_flow[117:1460]
         #self.content = self.content[:self.datagram_size]
 
         # TODO: Porque falla el packjet size llega mal. Los campos llegan todos mal?
@@ -37,10 +37,10 @@ class Datagram():
         self.datagram_number = datagram_number  # Numero de paquete que estoy enviando
         self.total_datagrams = total_datagrams  # Cantidad total de paquetes que se enviaran o se recibiran
         self.datagram_size = datagram_size  # Tamaño del paquete que se envia
-        self.content = content.ljust(1, b'0')  # Contenido del paquete
+        self.content = content.ljust(1343, b'0')  # Contenido del paquete
 
     def get_datagram_bytes(self):
-        format = '<B100sIIII1s'
+        format = '<B100sIIII1343s'
         return struct.pack(format, self.datagram_type, self.file_name.encode('utf-8'), self.file_size,
                            self.datagram_number, self.total_datagrams, self.datagram_size, self.content)
 
