@@ -17,14 +17,14 @@ DATAGRAM_SIZE = 1460
 class DatagramDeserialized:
 
     def __init__(self, bytes_flow):
-        self.datagram_type = struct.unpack('<B', bytes_flow[0:1])[0]
-        self.file_name = bytes_flow[1:101].decode().rstrip('\x00')
-        self.file_size = struct.unpack('<I', bytes_flow[101:105])[0]
-        self.datagram_number = struct.unpack('<I', bytes_flow[105:109])[0]
-        self.total_datagrams = struct.unpack('<I', bytes_flow[109:113])[0]
-        self.datagram_size = struct.unpack('<I', bytes_flow[113:117])[0]
-        self.content = bytes_flow[117:1460]
-        #self.content = self.content[:self.datagram_size]
+        self.datagram_type = struct.unpack('<B', bytes_flow[0:1])[0] # 1 byte
+        self.file_name = bytes_flow[1:101].decode().rstrip('\x00') # 100
+        self.file_size = struct.unpack('<I', bytes_flow[101:105])[0] # Podriamos sacarlo
+        self.datagram_number = struct.unpack('<I', bytes_flow[105:109])[0] # 4 bytes
+        self.total_datagrams = struct.unpack('<I', bytes_flow[109:113])[0] # 4 bytes
+        self.datagram_size = struct.unpack('<I', bytes_flow[113:117])[0] # 4 bytes
+        self.content = bytes_flow[117:1460] # 1343
+        self.content = self.content[:self.datagram_size]
 
         # TODO: Porque falla el packjet size llega mal. Los campos llegan todos mal?
 

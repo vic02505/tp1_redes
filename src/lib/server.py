@@ -29,7 +29,7 @@ class Server:
 
                 # En la espera de recibir un datagrama
                 bytes_flow, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
-                deserialized_datagram = DatagramDeserialized(bytes_flow)
+                #deserialized_datagram = DatagramDeserialized(bytes_flow)
 
                 # print(f"[SERVIDOR - Hilo principal] Recibio mensaje para: {client_address}")
 
@@ -43,10 +43,10 @@ class Server:
                     self.clients[client_address] = new_client_thread
                     
                     new_client_thread.start()
-                    new_client_queue.put(deserialized_datagram)
+                    new_client_queue.put(bytes_flow)
 
                 else:
-                    self.queues[client_address].put(deserialized_datagram)
+                    self.queues[client_address].put(bytes_flow)
 
             except Exception as e:
                 print(e)

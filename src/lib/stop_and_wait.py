@@ -5,8 +5,8 @@ from socket import socket
 from lib.communications import TypeOfDatagram, DatagramDeserialized, Datagram, FRAGMENT_SIZE, DATAGRAM_SIZE
 import lib.files_management as files_management
 
-TIMEOUT_CLIENT = 0.5
-TIMEOUT_SERVER = 0.5
+TIMEOUT_CLIENT = 0.1
+TIMEOUT_SERVER = 0.1
 
 
 class StopAndWait:
@@ -29,7 +29,7 @@ class StopAndWait:
 
     # Inicio server
     def start_server(self):
-        deserialized_datagram = self.queue.get()
+        deserialized_datagram = DatagramDeserialized(self.queue.get())
         print(f"[SERVIDOR - Hilo #{self.address}] Recibio mensaje de: {self.address}")
 
         if deserialized_datagram.datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
@@ -54,8 +54,8 @@ class StopAndWait:
 
     # Inicio de client
     def start_client(self, file_name, datagram_type):
-        self.socket.settimeout(TIMEOUT_CLIENT)
         print(f"[Cliente - {self.address}] Inicializando SW para cliente")
+        self.socket.settimeout(TIMEOUT_CLIENT)
         if datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
             print(f"[Cliente - {self.address}] Accion a realizar: Carga de un archivo al servidor")
 
@@ -84,6 +84,8 @@ class StopAndWait:
             # Send ack
             self.send_ack(ack_with_data.datagram_number)
 
+            self.socket.settimeout(None)
+
             # Comienzo a recibir el archivo
             self.recive_client_file(ack_with_data.total_datagrams, ack_with_data.file_name)
         else:
@@ -95,7 +97,7 @@ class StopAndWait:
         while True:
             try:
                 if self.is_server:
-                    ack_deserialized = self.queue.get()
+                    ack_deserialized = DatagramDeserialized(self.queue.get(timeout=TIMEOUT_SERVER))
                 else:
                     ack, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
                     ack_deserialized = DatagramDeserialized(ack)
@@ -125,7 +127,7 @@ class StopAndWait:
 
         # Obtenemos los datagramas
         # FIX datagram number o binario
-        datagrams = files_management.get_datagramas(file_contents)
+        datagrams = files_management.get_datagrams(file_contents)
 
         # Enviamos los datagramas
         for datagram in datagrams:
@@ -136,11 +138,11 @@ class StopAndWait:
     def receive_server_file(self, total_datagrams, file_name, datagram_number):
         received_data = []
         for i in range(1, total_datagrams + 1):
-            datagram_deserialized = self.queue.get()
+            datagram_deserialized = DatagramDeserialized(self.queue.get())
             while i != datagram_deserialized.datagram_number:
                 print(f"[SERVIDOR - Hilo #{self.address}] Ya recibí este datagrama  {datagram_deserialized.datagram_number}")
                 self.send_ack(datagram_deserialized.datagram_number)
-                datagram_deserialized = self.queue.get()
+                datagram_deserialized = DatagramDeserialized(self.queue.get())
             received_data.append(datagram_deserialized.content)
             self.send_ack(datagram_deserialized.datagram_number)
 
@@ -151,6 +153,7 @@ class StopAndWait:
     def recive_client_file(self, total_datagrams, file_name):
         received_data = []
         for i in range(1, total_datagrams + 1):
+            # Aca falta un try catch  (para mi no)
             datagram_deserialized = DatagramDeserialized(self.socket.recv(DATAGRAM_SIZE))
             while i != datagram_deserialized.datagram_number:
                 print(f"[Cliente - {self.address}] Ya recibí este datagrama  {datagram_deserialized.datagram_number}")
@@ -170,7 +173,7 @@ class StopAndWait:
             raise "Archivo no encontrado"
 
         # Obtenemos los datagramas
-        datagrams = files_management.get_datagramas(file_contents)
+        datagrams = files_management.get_datagrams(file_contents)
 
         # Enviamos los datagramas
         for datagram in datagrams:

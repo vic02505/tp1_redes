@@ -3,12 +3,13 @@ from sys import argv
 from lib.client import Client
 
 if __name__ == '__main__':
-    if len(argv) < 2:
+    if len(argv) < 3:
         print("Use: python upload.py <nombre_documento> <puerto_servidor>")
         exit(1)
     
     try:
         file_name = argv[1]
+        # type_communication = argv[2]
         print(f"{file_name}")
         client = Client()
         client.upload(file_name)
