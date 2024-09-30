@@ -4,8 +4,11 @@ from src.lib.sack_communications import TypeOfSackDatagram, LengthsForSackDatagr
 
 import time
 
+from src.lib.selective_ack import TIMEOUT
+
 TIMEOUT_CLIENT = 0.1
 TIMEOUT_SERVER = 0.1
+TIMEOUT_RESEND = 0.5 # For time_stamp
 
 
 class SelectiveAcK:
@@ -110,7 +113,7 @@ class SelectiveAcK:
 
         while recognized_file_fragments < len(datagrams):
 
-            while  datagrams_in_congestion_window < self.congestion_window_size:
+            while datagrams_in_congestion_window < self.congestion_window_size:
 
                 # TODO: en la primer iteracion se envian los 5 datagrams de una, pero desp quizas hay que enviar
                 #       datagramas especificos. Tener en cuenta para el sendto
@@ -128,28 +131,56 @@ class SelectiveAcK:
             ack, client_address = None, None
             ack, client_address = self.socket.recv(SACK_DATAGRAM_SIZE)
 
+            # no recibi nada, seteo el datagrams_in_congestion_window en 0
             if ack is None:
+                datagrams_in_congestion_window = 0
                 continue
 
             ack_deserialized = SackDatagramDeserialized(ack)
             datagrams_in_congestion_window -= 1
             ack_number = ack_deserialized.datagram_number
 
-            
-            # datagrams_to_resend = []
-            # # TODO: Manejo de los timestamps
-            # for datagram_sended in congestion_window:
-            #
-            #     ts_datagram = sent_datagrams[datagram_sended].1
-            #     if ts_datagram:
-            #         ts = time.time()
-            #         if (ts - ts_datagram) > 0.5:
-            #             # TODO: Tengo que volver a enviarlo porque hubo perdida de paquetes
-            #             datagrams_to_resend.append(datagram_sended)
-            #
-            #             pass
-            recognized_file_fragments = calculate_recog_file_datagrams(ack_number, sacks)
-        pass
+            # remplazo los mensajes que ya fueron reconocidos por None
+            self.replace_recognized_datagrams_with_none(ack_deserialized, congestion_window)
+
+            # TODO: Manejo de los timestamps
+            datagrams_to_resend = []
+            for datagram_sent, ts_datagram in congestion_window:
+                if datagram_sent is None or ts_datagram is None:
+                    continue
+                ts = time.time()
+                if (ts - ts_datagram) > TIMEOUT_RESEND:
+                    datagrams_to_resend.append(datagram_sent)
+
+            for datagram in datagrams_to_resend:
+                self.socket.sendto(datagram.get_datagram_bytes(), self.destination_address)
+                # Ya estan agregados a la lista de congestion, no hace falta agregarlos de nuevo
+
+
+    def replace_recognized_datagrams_with_none(self, ack_deserialized, congestion_window):
+        for datagram, _ in congestion_window:
+            if datagram is None:
+                continue
+            if datagram.datagram_number == ack_deserialized.datagram_number:
+                congestion_window[congestion_window.index((datagram, _))] = None
+
+        # ahora los sacks (init, end)
+        sacks = [ack_deserialized.first_sack, ack_deserialized.second_sack, ack_deserialized.third_sack, ack_deserialized.fourth_sack]
+        for sack in sacks:
+            if sack is None:
+                continue
+            self.replace_sacks_with_none(sack[0], sack[1], congestion_window)
+
+    def replace_sacks_with_none(self, init, end, congestion_window):
+        #TODO: handalear el caso que end sea None
+
+        for i in range(init, end):
+            for datagram, _ in congestion_window:
+                if datagram is None:
+                    continue
+                if datagram.datagram_number == i:
+                    # creo que esto del index se puede hacer de otra forma si quieren
+                    congestion_window[congestion_window.index((datagram, _))] = None
 
 
     # Wait ack: espera que llegue un ack, si no llega, reenvia el datagrama
