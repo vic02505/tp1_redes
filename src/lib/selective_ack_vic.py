@@ -1,49 +1,48 @@
-from src.lib import files_management
-from src.lib.sack_communications import TypeOfSackDatagram, LengthsForSackDatagram, AmountOfSacks, SackDatagram, \
+from lib import files_management
+from lib.sack_communications import TypeOfSackDatagram, LengthsForSackDatagram, AmountOfSacks, SackDatagram, \
     SackDatagramDeserialized, SACK_DATAGRAM_SIZE
 
 import time
 
-from src.lib.selective_ack import TIMEOUT
+TIMEOUT = 2
 
 TIMEOUT_CLIENT = 0.1
 TIMEOUT_SERVER = 0.1
 TIMEOUT_RESEND = 0.5 # For time_stamp
 
 
-class SelectiveAcK:
-    def __init__(self, origin_address, destination_address, is_server, socket, messages_queue, messages_vector,
+class SelectiveAck:
+    def __init__(self, destination_address, is_server, socket, messages_queue, messages_vector,
                  congestion_window):
-        self.origin_address = None
-        self.destination_address = None
-        self.is_server = False
-        self.socket = None
-        self.messages_queue = None
-        self.messages_vector = None
-        self.congestion_window_size = None
+        self.destination_address = destination_address
+        self.is_server = is_server
+        self.socket = socket
+        self.messages_queue = messages_queue
+        self.messages_vector = messages_vector
+        self.congestion_window_size = congestion_window
 
     @classmethod
-    def create_selective_ack_for_server(cls, origin_address, destination_address, messages_queue, sending_socket):
-        return cls(origin_address=origin_address, destination_address=destination_address, is_server=True,
-                   socket=sending_socket,messages_queue=messages_queue, messages_vector=None,congestion_window=None)
+    def create_selective_ack_for_server(cls, sending_socket, destination_address, messages_queue):
+        return cls(destination_address=destination_address, is_server=True,
+                   socket=sending_socket,messages_queue=messages_queue, messages_vector=None,congestion_window=5)
 
     @classmethod
-    def create_selective_ack_for_client(cls, origin_address, destination_address, communication_socket):
-        return cls(origin_address=origin_address, destination_address=destination_address, is_server=True,
-                   socket=communication_socket, messages_queue=None, messages_vector=None, congestion_window=None)
+    def create_selective_ack_for_client(cls, destination_address, communication_socket):
+        return cls(destination_address=destination_address, is_server=False,
+                   socket=communication_socket, messages_queue=None, messages_vector=None, congestion_window=5)
 
     def start_server(self):
-        sack_datagram = self.messages_queue.get()
-        client_message = SackDatagramDeserialized(sack_datagram)
+        deserialized_datagram = SackDatagramDeserialized(self.messages_queue.get())
 
-        if client_message.datagram_type == TypeOfSackDatagram.UPLOAD.value:
-            file_name = client_message.file_name
-            total_datagrams = client_message.total_datagrams
-            datagram_number = client_message.datagram_number
-            self.send_ack()
-            self.receiving_operation_for_server()
-        elif client_message.datagram_type == TypeOfSackDatagram.DOWNLOAD.value:
-            file_name = client_message.file_name
+        if deserialized_datagram.datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value:
+            print("start upload")
+            file_name = deserialized_datagram.file_name
+            total_datagrams = deserialized_datagram.total_datagrams
+            datagram_number = deserialized_datagram.datagram_number
+            self.send_ack(datagram_number)
+            self.receiving_operation_for_server(total_datagrams)
+        elif deserialized_datagram.datagram_type == TypeOfSackDatagram.HEADER_DOWNLOAD.value:
+            file_name = deserialized_datagram.file_name
             file_size = files_management.get_file_size(file_name)
             total_datagrams = files_management.get_count_of_datagrams(file_name)
 
@@ -54,19 +53,15 @@ class SelectiveAcK:
 
     def start_client(self, file_name, datagram_type):
         self.socket.settimeout(TIMEOUT_CLIENT)
-        print(f"[Cliente - {self.origin_address}] Inicializando Selective ACK para cliente")
         if datagram_type == TypeOfSackDatagram.HEADER_DOWNLOAD.value:
             pass
         elif datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value:
-
-            print(f"[Cliente - {self.origin_addressaddress}] Accion a realizar: Carga de un archivo al servidor")
-
+            
             # Armo el header UPLOAD
             file_size = files_management.get_file_size(file_name)
             total_datagrams = files_management.get_count_of_datagrams(file_name)
             print(f"EL NUMERO DE DATAGRAMAS ES {total_datagrams}")
-            upload_header = SackDatagram.create_upload_header_client(file_name, file_size, total_datagrams)
-
+            upload_header = SackDatagram.create_upload_datagram_for_client(file_name, total_datagrams)
             # Envio el header
             self.socket.sendto(upload_header.get_datagram_bytes(), self.destination_address)
             # Espero el ACK
@@ -77,8 +72,11 @@ class SelectiveAcK:
         else:
            raise Exception(f"[Servidor - Hilo #{self.destination_address}] El primer mensaje no es un header")
 
-    def send_ack(self):
-        pass
+    def send_ack(self, ack_number):
+        # Envio el ack
+        ack_datagram = SackDatagram.create_ack(0,[[0,0],[0,0],[0,0],[0,0]],ack_number)
+        bytes = ack_datagram.get_datagram_bytes()
+        self.socket.sendto(bytes, self.destination_address)
 
     def receiving_operation_for_client(self):
         pass
@@ -93,9 +91,9 @@ class SelectiveAcK:
     def update_congestion_window():
        pass
 
-
     def sending_operation_for_client(self, file_name):
         ## Completar
+        print("BOooocaaaaa")
         try:
             file_contents = files_management.get_file_content(file_name)
         except:
@@ -108,7 +106,7 @@ class SelectiveAcK:
         datagrams_in_congestion_window = 0
         next_datagram_to_send = 0
 
-        self.socket.settimeout(0,1) # setearlo en start client
+        self.socket.settimeout(TIMEOUT_CLIENT) # setearlo en start client
         self.socket.setblocking(False)
 
         while recognized_file_fragments < len(datagrams):
@@ -122,7 +120,8 @@ class SelectiveAcK:
                 datagram = datagrams[next_datagram_to_send]
                 self.socket.sendto(datagram.get_datagram_bytes(), self.destination_address)
                 free_position = self.get_congestion_window_first_free_position(congestion_window)
-                congestion_window[free_position] = (datagram, time.time())
+                if free_position is not None:
+                    congestion_window[free_position] = (datagram, time.time())
 
                 datagrams_in_congestion_window += 1
                 next_datagram_to_send += 1
@@ -182,9 +181,9 @@ class SelectiveAcK:
                     # creo que esto del index se puede hacer de otra forma si quieren
                     congestion_window[congestion_window.index((datagram, _))] = None
 
-
     # Wait ack: espera que llegue un ack, si no llega, reenvia el datagrama
     def wait_ack_client(self, datagram):
+        print("Esperando ack")
         # Mientras no recibo el ack, mando de vuelta el datagram
         while True:
             try:
@@ -192,14 +191,13 @@ class SelectiveAcK:
                     ack, client_address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
                     ack_deserialized = SackDatagramDeserialized(ack)
                 if ack_deserialized.datagram_number == datagram.datagram_number:
-                    print(f"[Cliente - {self.origin_address}] Recibi ACK correcto")
+                    print(f"Recibi ACK correcto")
                     return ack_deserialized
             # Excepción por timeout
             except Exception:
-                print(f"[Cliente - {self.origin_address}] Timeout alcanzado esperando ACK")
-                self.socket.sendto(datagram.get_datagram_bytes(), self.origin_address)
-                print(f"[Cliente - {self.origin_address}] Datagrama enviado nuevamente")
-
+                #print(f"[Cliente - {self.origin_address}] Timeout alcanzado esperando ACK")
+                self.socket.sendto(datagram.get_datagram_bytes(), self.destination_address)
+                #print(f"[Cliente - {self.origin_address}] Datagrama enviado nuevamente")
 
     @staticmethod
     def get_second_sack_position(begin, received_data):

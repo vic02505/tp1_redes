@@ -52,6 +52,8 @@ def get_datagrams_for_sack(file_contents):
                                                datagram_number=i+1, content_size=end-start, content=file_fragment)
         datagrams_hash[i+1] = datagram
 
+    return datagrams_hash
+
 
 def get_datagrams(file_contents):
     # Cantidad de fragmentos

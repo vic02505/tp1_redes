@@ -2,7 +2,9 @@ import queue
 import socket
 import threading
 from lib.communications import Datagram, TypeOfDatagram, DatagramDeserialized, DATAGRAM_SIZE, FRAGMENT_SIZE
+
 from lib.stop_and_wait import StopAndWait
+from lib.selective_ack_vic import SelectiveAck
 
 class Server:
     def __init__(self, host, port):
@@ -54,5 +56,7 @@ class Server:
 def client_thread(address, client_queue):
     print(f"[SERVIDOR - Hilo #{address}] Comienza a correr el thread del cliente")
     socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    stop_and_wait =  StopAndWait.create_stop_and_wait_for_server(socket_client, address, client_queue)
-    stop_and_wait.start_server()
+    selective_ack = SelectiveAck.create_selective_ack_for_server(socket_client, address, client_queue)
+#    stop_and_wait =  StopAndWait.create_stop_and_wait_for_server(socket_client, address, client_queue)
+#    stop_and_wait.start_server()
+    selective_ack.start_server()

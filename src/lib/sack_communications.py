@@ -11,8 +11,8 @@ class LengthsForSackDatagram(Enum):
 
 class TypeOfSackDatagram(Enum):
     ACK = 1
-    DOWNLOAD = 2
-    UPLOAD = 3
+    HEADER_DOWNLOAD = 2
+    HEADER_UPLOAD = 3
     CONTENT = 4
 
 class AmountOfSacks(Enum):
@@ -41,7 +41,7 @@ class SackDatagramDeserialized:
 
         self.datagram_type = struct.unpack('<B', bytes_flow[0:1])[0] # 1 byte
         self.number_of_sacks = struct.unpack('<B', bytes_flow[1:2])[0] # 1 byte
-        self.get_sacks(bytes_flow[2:34]) #32 bytes
+        self.get_sacks(bytes_flow[2:34]) #32 bytes # "2-3, 4-5, 6-7, 8-9"
         self.file_name = bytes_flow[34:134].decode().rstrip('\x00') # 100
         self.datagram_number = struct.unpack('<I', bytes_flow[134:138])[0] # 4 bytes
         self.total_datagrams = struct.unpack('<I', bytes_flow[138:142])[0] # 4 bytes
@@ -73,21 +73,21 @@ class SackDatagramDeserialized:
 class SackDatagram:
     def __init__(self, datagram_type, number_of_sacks, sacks_content, file_name, datagram_number, total_datagrams,
                  content_size, content):
-        self.datagram_type = datagram_type # 1 byte
-        self.number_of_sacks = number_of_sacks # 1 byte
-        self.sacks_content = sacks_content # 32 bytes
-        self.file_name = file_name # 100 bytes
-        self.datagram_number = datagram_number # 4 bytes (puede ser usado como numero de ack)
-        self.total_datagrams = total_datagrams # 4 bytes
-        self.content_size = content_size # 2 bytes
+        self.datagram_type = datagram_type # Define que tipo de mensaje es (ACK, HEADER_DOWNLOAD, HEADER_UPLOAD, CONTENT)
+        self.number_of_sacks = number_of_sacks # Define la cantidad de SACKS que se están transmitiendo. 
+        self.sacks_content = sacks_content # Define el contenido de los sacks. Es un string? Son varios numeros? 
+        self.file_name = file_name # Define el nombre del archivo
+        self.datagram_number = datagram_number # Numero de datagrama que se está enviando (sirve para el ack también)
+        self.total_datagrams = total_datagrams # Total de datagramas que se van a enviar con el paquete.
+        self.content_size = content_size # Contenido del datagrama
         self.content =  content.ljust(1315, b'0')  #  1315 bytes
 
     def get_datagram_bytes(self):
-        format = '<BB8s8s8s8s100sIIH1315s'
+        format = '<BBIIIIIIII100sIIH1315s'
         return struct.pack(format, self.datagram_type, self.number_of_sacks,
                            self.sacks_content[0][0], self.sacks_content[0][1],self.sacks_content[1][0],
             self.sacks_content[1][1], self.sacks_content[2][0], self.sacks_content[2][1], self.sacks_content[3][0],
-            self.sacks_content[3][1], self.file_name,self.datagram_number, self.total_datagrams, self.content_size,
+            self.sacks_content[3][1], self.file_name.encode('utf-8'),self.datagram_number, self.total_datagrams, self.content_size,
                            self.content)
 
     @classmethod
@@ -98,9 +98,6 @@ class SackDatagram:
 
     @classmethod
     def create_ack(cls, number_of_sacks, sacks_content, ack_number):
-
-        #co
-
         return cls(datagram_type=TypeOfSackDatagram.ACK.value, number_of_sacks=number_of_sacks,
                    sacks_content=sacks_content, file_name="", datagram_number=ack_number, total_datagrams=0,
                    content_size=0, content=b"")
@@ -111,7 +108,7 @@ class SackDatagram:
                      file_name=file_name, datagram_number=0, total_datagrams=0, content_size=0, content=b"")
     @classmethod
     def create_upload_datagram_for_client(cls, file_name, total_datagrams):
-        return  cls(datagram_type=TypeOfSackDatagram.UPLOAD.value, number_of_sacks=0, sacks_content="",
+        return  cls(datagram_type=TypeOfSackDatagram.HEADER_UPLOAD.value, number_of_sacks=0, sacks_content=[[0,0],[0,0],[0,0],[0,0]],
                      file_name=file_name, datagram_number=0, total_datagrams=total_datagrams, content_size=0,
                     content=b"")
 
@@ -121,6 +118,8 @@ class SackDatagram:
         return cls(datagram_type=TypeOfSackDatagram.DOWNLOAD.value,   number_of_sacks=0, sacks_content="",
                      file_name=file_name, datagram_number=0, total_datagrams=total_datagrams, content_size=0,
                    content=b"")
+
+
 
     
 

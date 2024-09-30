@@ -4,8 +4,8 @@
     server: python3 start_server.py {host} {nro_puerto}
         ej: python3 start_server.py 127.0.0.1 1234
 
-    client: upload.py {archivo} {nro_puerto}
-        ej: upload.py tp.pdf 1234
+    client: python3 upload.py {archivo} {nro_puerto}
+        ej: python3 upload.py tp.pdf 1234
         
 
 ## Selective ACK:
