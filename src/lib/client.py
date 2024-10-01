@@ -6,7 +6,7 @@ import os
 from lib.communications import TypeOfDatagram
 from lib.sack_communications import TypeOfDatagram
 
-PORT = 1234
+PORT = 12345
 
 from lib.selective_ack import SelectiveAck
 from lib.stop_and_wait import StopAndWait

@@ -191,6 +191,7 @@ class SelectiveAck:
                                                    last_ack_number == datagram.datagram_number - 1), None)
                         '''
                         datagrams.insert(0, datagram_to_resend)
+                        datagrams_flying.remove(datagram_to_resend)
                         ack_repetitions = 0
 
 
