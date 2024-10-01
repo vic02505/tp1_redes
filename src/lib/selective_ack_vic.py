@@ -6,9 +6,9 @@ import time
 
 TIMEOUT = 2
 
-TIMEOUT_CLIENT = 0.1
-TIMEOUT_SERVER = 0.1
-TIMEOUT_RESEND = 0.5 # For time_stamp
+TIMEOUT_CLIENT = 1
+TIMEOUT_SERVER = 1
+TIMEOUT_RESEND = 5 # For time_stamp
 
 
 class SelectiveAck:
@@ -107,16 +107,20 @@ class SelectiveAck:
         next_datagram_to_send = 0
 
         self.socket.settimeout(TIMEOUT_CLIENT) # setearlo en start client
-        self.socket.setblocking(False)
+        #self.socket.setblocking(False)
+
+        # Si envio un archivo con pocos datagramas, la congestion window se ajusta
+        if len(datagrams) < self.congestion_window_size:
+            self.congestion_window_size = len(datagrams)
 
         while recognized_file_fragments < len(datagrams):
 
-            while datagrams_in_congestion_window < self.congestion_window_size:
+            while datagrams_in_congestion_window < (self.congestion_window_size -1):
 
                 # TODO: en la primer iteracion se envian los 5 datagrams de una, pero desp quizas hay que enviar
                 #       datagramas especificos. Tener en cuenta para el sendto
                 # TODO: Actualizar hora de envio de datagrama enviado
-
+                print(f"Enviando datagrama {next_datagram_to_send}")
                 datagram = datagrams[next_datagram_to_send]
                 self.socket.sendto(datagram.get_datagram_bytes(), self.destination_address)
                 free_position = self.get_congestion_window_first_free_position(congestion_window)
@@ -127,7 +131,7 @@ class SelectiveAck:
                 next_datagram_to_send += 1
 
             # puede pasar que no se reciba nada, deberia estar en try exception?
-            ack, client_address = None, None
+            # ack, client_address = None, None
             ack, client_address = self.socket.recv(SACK_DATAGRAM_SIZE)
 
             # no recibi nada, seteo el datagrams_in_congestion_window en 0
@@ -226,11 +230,11 @@ class SelectiveAck:
 
         received_datagrams = 0
         received_data = [-1] * amount_of_datagrams
-
+        print(f"Esperando recibir {amount_of_datagrams} datagramas")
         while received_datagrams < amount_of_datagrams:
             datagram, client_address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
             datagram_deserialized = SackDatagramDeserialized(datagram)
-
+            print(f"Recibi datagrama {datagram_deserialized.datagram_number}")
             if received_data[datagram_deserialized.datagram_number] == -1:
                 received_data[datagram_deserialized.datagram_number] = datagram_deserialized.content
             else:
@@ -241,6 +245,7 @@ class SelectiveAck:
             ack_datagram_bytes = ack_datagram.get_datagram_bytes()
 
             self.socket.sendto(ack_datagram_bytes, client_address)
+            received_datagrams += 1
 
     def sending_operation_for_server(self):
         pass

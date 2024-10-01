@@ -41,7 +41,7 @@ def create_new_file(bytes_flow, file_name):
 def get_datagrams_for_sack(file_contents):
 
     total_datagrams = math.ceil(len(file_contents) / FRAGMENT_SIZE)
-    datagrams_hash = {}
+    datagrams = []
 
     for i in range(total_datagrams):
         start = i * FRAGMENT_SIZE
@@ -50,9 +50,9 @@ def get_datagrams_for_sack(file_contents):
 
         datagram = SackDatagram.create_content(total_datagrams=total_datagrams,
                                                datagram_number=i+1, content_size=end-start, content=file_fragment)
-        datagrams_hash[i+1] = datagram
+        datagrams.append(datagram)
 
-    return datagrams_hash
+    return datagrams
 
 
 def get_datagrams(file_contents):

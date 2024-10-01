@@ -93,7 +93,7 @@ class SackDatagram:
     @classmethod
     def create_content(cls, datagram_number, total_datagrams, content_size, content):
         return cls(datagram_type=TypeOfSackDatagram.CONTENT.value, number_of_sacks= 0,
-                   sacks_content="", file_name="", datagram_number=datagram_number,
+                   sacks_content=[[0,0],[0,0],[0,0],[0,0]], file_name="", datagram_number=datagram_number,
                    total_datagrams=total_datagrams, content_size=content_size, content=content)
 
     @classmethod
