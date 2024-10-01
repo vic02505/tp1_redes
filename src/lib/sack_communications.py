@@ -31,7 +31,6 @@ class DatagramDeserialized:
         self.content = bytes_flow[153:153 + SACK_FRAGMENT_SIZE]  # 1343 bytes
         self.content = self.content[:self.datagram_size]
 
-        # TODO: Porque falla el packjet size llega mal. Los campos llegan todos mal?
 
 
 class Datagram():

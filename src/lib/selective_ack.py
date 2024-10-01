@@ -5,7 +5,7 @@ import lib.files_management as files_management
 TIMEOUT_CLIENT = 0.1
 TIMEOUT_SERVER = 0.1
 WINDOWS_SIZE = 5
-MAX_ACK_REPETITIONS = 3
+MAX_ACK_REPETITIONS = 2
 
 
 class SelectiveAck:
@@ -120,7 +120,7 @@ class SelectiveAck:
     # Send sack: envia un sack con un ack_number y con una lista de sacks
     def send_sack(self, ack_number, list_of_sacks):
         # Envio el sack
-        sack_datagram = Datagram.create_sack(ack_number, list_of_sacks)
+        sack_datagram = Datagram.create_sack(ack_number, len(list_of_sacks), list_of_sacks)
         bytes = sack_datagram.get_datagram_bytes()
         self.socket.sendto(bytes, self.address)
 
@@ -159,21 +159,26 @@ class SelectiveAck:
 
             # Espero los acks o sacks
             datagram_deserialized = DatagramDeserialized(self.socket.recv(SACK_DATAGRAM_SIZE))
-            
-            if datagram_deserialized.datagram_type == TypeOfDatagram.ACK.value:
-                print("ACK recibido")
-                # Saco el datagrama de datagrams_flying
-                window_size_remaining += self.remove_datagram_from_flying(datagrams_flying, datagram_deserialized)
-            elif datagram_deserialized.datagram_type == TypeOfDatagram.SACK.value:
+
+            if datagram_deserialized.datagram_type == TypeOfDatagram.SACK.value:
                 print("SACK recibido")
                 # Manejo el ack repetido
                 if last_ack_number != datagram_deserialized.datagram_number:
+                    last_ack_number = datagram_deserialized.datagram_number
                     ack_repetitions = 1
                 else:
                     ack_repetitions += 1
                     if ack_repetitions == MAX_ACK_REPETITIONS:
+                        print("ACK repetido, reinserto")
                         # Reenvio el paquete
-                        datagrams.insert(0, datagram)
+                        for datagram in datagrams_flying:
+                            if datagram.datagram_number == last_ack_number:
+                                datagram_to_resend = datagram
+                        '''
+                        datagram_to_resend = next((datagram for datagram in datagrams_flying if
+                                                   last_ack_number == datagram.datagram_number - 1), None)
+                        '''
+                        datagrams.insert(0, datagram_to_resend)
                         ack_repetitions = 0
 
                     # Saco el paquete de flying del ACK recibido
@@ -197,47 +202,85 @@ class SelectiveAck:
                 return 1
         return 0
 
-    def get_second_sack_possition(self, sack_begin, received_datagrams_numbers):
-        for i in range(sack_begin+1, len(received_datagrams_numbers)):
-            if (received_datagrams_numbers[i] - received_datagrams_numbers[i - 1] > 1):
-                return received_datagrams_numbers[i - 1] + 1
 
-    def get_sack(self, received_datagrams_numbers, total_datagrams):
-        list_of_sacks = []
+    def get_sacks(self, begin, received, total):
+        sacks = []
 
-        for i in range(1, len(received_datagrams_numbers)):
-            if (received_datagrams_numbers[i] - received_datagrams_numbers[i - 1]) > 1:
-                sack_begin = received_datagrams_numbers[i]
-                sack_end = self.get_second_sack_possition(i, received_datagrams_numbers)
+        # Empezar a recorrer los datagramas recibidos
+        i = begin
+        while i < len(received):
+            start = received[i]  # Primer datagrama del bloque
+            # Encontrar el fin del bloque continuo
+            while i + 1 < len(received) and received[i + 1] == received[i] + 1:
+                i += 1
+            end = received[i]  # Último datagrama del bloque
+            # Determinar el siguiente esperado
+            next_expected = end + 1 if end + 1 <= total else None
+            sacks.append((start, next_expected))
+            i += 1
 
-                if sack_end == None:
-                    sack_end = total_datagrams
+        return sacks[0:4]
 
-                list_of_sacks.append((sack_begin, sack_end))
-                    
-        return list_of_sacks
+
+
 
     def receive_server_file(self, total_datagrams, file_name, datagram_number):
         received_data = [None] * total_datagrams
         received_datagrams_numbers = []
-
-        for i in range(1, total_datagrams + 1):
+        contador_aux = 0
+        last_ack_number = 0
+        while len(received_datagrams_numbers) < total_datagrams:
             datagram_deserialized = DatagramDeserialized(self.queue.get())
-            received_data[datagram_deserialized.datagram_number-1] = datagram_deserialized.content
+            contador_aux += 1
 
+            # Pruena de perdida de paquetes a mano
+            if contador_aux % 3 == 0:
+                print("entro al contador")
+                continue
+
+            print("recibio datagrama numero:", datagram_deserialized.datagram_number)
+
+            received_data[datagram_deserialized.datagram_number - 1] = datagram_deserialized.content
             if datagram_deserialized.datagram_number not in received_datagrams_numbers:
                 received_datagrams_numbers.append(datagram_deserialized.datagram_number)
                 received_datagrams_numbers.sort()
 
-            list_of_sacks = self.get_sack(received_datagrams_numbers, total_datagrams)
-            print("Lista de sacks: ", list_of_sacks)
-            if len(list_of_sacks) == 0:
-                self.send_ack(datagram_deserialized.datagram_number + 1)
+            if last_ack_number + 1 == datagram_deserialized.datagram_number:
+                list_of_sacks = [[0,0],[0,0],[0,0],[0,0]]
             else:
+                list_of_sacks = self.get_sacks(received_datagrams_numbers, total_datagrams)
+                self.fill_with_ceros(list_of_sacks)
+            print("Lista de sacks: ", list_of_sacks)
+            '''
+                [1,2,3,4,5]
+                
+                Recibo 1:
+                ACK = 2 y SACK [[0,0],[0,0],[0,0],[0,0]]
+                
+                Recibo 2:
+                ACK = 3 y SACK [[0,0],[0,0],[0,0],[0,0]]
+                
+                Pierdo 3:
+                
+                Recibo 4:
+                ACK = 3 y SACK [[4,5],[0,0],[0,0],[0,0]]
+                
+                Recibo 5:
+                ...... [[4,6],[0,0],[0,0],[0,0]]
+                
+            '''
+            if list_of_sacks == [[0, 0], [0, 0], [0, 0], [0, 0]]:
                 self.send_sack(datagram_deserialized.datagram_number + 1, list_of_sacks)
+                last_ack_number = datagram_deserialized.datagram_number
+            else:
+                self.send_sack(last_ack_number + 1, list_of_sacks)
         
         print(f"[SERVIDOR - Hilo #{self.address}] Creado con éxito el archivo {file_name}")
         files_management.create_new_file(received_data, file_name)
+
+    def fill_with_ceros(self, list_of_sacks):
+        while len(list_of_sacks) < 4:
+            list_of_sacks.append((0, 0))
 
     # Operaciones para el DOWNLOAD
     def recive_client_file(self, total_datagrams, file_name):
