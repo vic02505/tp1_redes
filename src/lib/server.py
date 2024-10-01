@@ -1,10 +1,11 @@
 import queue
 import socket
 import threading
-from lib.communications import Datagram, TypeOfDatagram, DatagramDeserialized, DATAGRAM_SIZE, FRAGMENT_SIZE
+#from lib.communications import Datagram, TypeOfDatagram, DatagramDeserialized, DATAGRAM_SIZE, FRAGMENT_SIZE
+from lib.sack_communications import SACK_DATAGRAM_SIZE 
 
 from lib.stop_and_wait import StopAndWait
-from lib.selective_ack_vic import SelectiveAck
+from lib.selective_ack import SelectiveAck
 
 class Server:
     def __init__(self, host, port):
@@ -30,7 +31,7 @@ class Server:
                 # print(f"[SERVIDOR - Hilo principal] Esperando mensajes")
 
                 # En la espera de recibir un datagrama
-                bytes_flow, client_address = self.socket.recvfrom(DATAGRAM_SIZE)
+                bytes_flow, client_address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
                 #deserialized_datagram = DatagramDeserialized(bytes_flow)
 
                 # print(f"[SERVIDOR - Hilo principal] Recibio mensaje para: {client_address}")

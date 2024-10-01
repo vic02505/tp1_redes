@@ -2,9 +2,10 @@ import math
 import os
 
 from PIL.ImImagePlugin import number
-from lib.communications import Datagram, FRAGMENT_SIZE
+#from lib.communications import Datagram, FRAGMENT_SIZE
+from lib.sack_communications import Datagram, SACK_FRAGMENT_SIZE
 
-from lib.sack_communications import SackDatagram
+# from lib.sack_communications import SackDatagram
 
 
 def get_count_of_datagrams(file_name):
@@ -14,7 +15,7 @@ def get_count_of_datagrams(file_name):
     except:
         raise "Archivo no encontrado"
 
-    return math.ceil(len(file_contents) / FRAGMENT_SIZE)
+    return math.ceil(len(file_contents) / SACK_FRAGMENT_SIZE)
 
 
 def get_file_size(file_name):
@@ -38,7 +39,7 @@ def create_new_file(bytes_flow, file_name):
 
 
 
-def get_datagrams_for_sack(file_contents):
+'''def get_datagrams_for_sack(file_contents):
 
     total_datagrams = math.ceil(len(file_contents) / FRAGMENT_SIZE)
     datagrams = []
@@ -52,18 +53,18 @@ def get_datagrams_for_sack(file_contents):
                                                datagram_number=i+1, content_size=end-start, content=file_fragment)
         datagrams.append(datagram)
 
-    return datagrams
+    return datagrams'''
 
 
 def get_datagrams(file_contents):
     # Cantidad de fragmentos
-    total_datagrams = math.ceil(len(file_contents) / FRAGMENT_SIZE)
+    total_datagrams = math.ceil(len(file_contents) / SACK_FRAGMENT_SIZE)
     datagrams = []
 
     # Generamos los datagramas a enviar
     for i in range(total_datagrams):
-        start = i * FRAGMENT_SIZE
-        end = min(start + FRAGMENT_SIZE, len(file_contents))
+        start = i * SACK_FRAGMENT_SIZE
+        end = min(start + SACK_FRAGMENT_SIZE, len(file_contents))
         fragment = file_contents[start:end]
         datagram = Datagram.create_content(
             datagram_number=i+1,
