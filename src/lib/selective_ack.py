@@ -190,6 +190,10 @@ class SelectiveAck:
                         datagram_to_resend = next((datagram for datagram in datagrams_flying if
                                                    last_ack_number == datagram.datagram_number - 1), None)
                         '''
+
+                        ##LEER!!!!!!!!!!!!!!!!!!!!!!!!
+                        ##El datagram_to_resend entro del insert me hace ruido, chequear que onda,
+                        ##la ide me lo marcar en rojo.
                         datagrams.insert(0, datagram_to_resend)
                         datagrams_flying.remove(datagram_to_resend)
                         ack_repetitions = 0
