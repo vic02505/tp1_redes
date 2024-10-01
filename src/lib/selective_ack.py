@@ -279,9 +279,9 @@ class SelectiveAck:
             print("Lista de sacks: ", list_of_sacks)
 
             if list_of_sacks == [[0, 0], [0, 0], [0, 0], [0, 0]]:
-                print("Esta en orden, envio: ", datagram_deserialized.datagram_number + 1)
-                self.send_sack(datagram_deserialized.datagram_number + 1, list_of_sacks, amount_of_sacks)
                 last_ack_number = self.get_next_ack_number(received_datagrams_numbers)
+                self.send_sack(last_ack_number + 1, list_of_sacks, amount_of_sacks)
+                print("Last ack number: ", last_ack_number)
             else:
                 print("No esta en orden, envio: ", last_ack_number + 1)
                 self.send_sack(last_ack_number + 1, list_of_sacks, amount_of_sacks)
