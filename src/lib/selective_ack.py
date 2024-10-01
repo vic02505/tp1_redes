@@ -251,10 +251,10 @@ class SelectiveAck:
             datagram_deserialized = DatagramDeserialized(self.queue.get())
             contador_aux += 1
 
-            # Pruena de perdida de paquetes a mano
-            if contador_aux % 3 == 0:
-                print("entro al contador")
-                continue
+            # # Pruena de perdida de paquetes a mano
+            # if contador_aux % 3 == 0:
+            #     print("entro al contador")
+            #     continue
 
             print("recibio datagrama numero:", datagram_deserialized.datagram_number)
 
