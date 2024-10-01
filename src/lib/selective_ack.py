@@ -180,6 +180,8 @@ class SelectiveAck:
                     window_size_remaining += self.remove_datagram_from_flying(datagrams_flying, datagram_deserialized)
                 else:
                     ack_repetitions += 1
+                    datagram_to_resend = None
+
                     if ack_repetitions == MAX_ACK_REPETITIONS:
                         print("ACK repetido, reinserto")
                         # Reenvio el paquete
@@ -194,8 +196,12 @@ class SelectiveAck:
                         ##LEER!!!!!!!!!!!!!!!!!!!!!!!!
                         ##El datagram_to_resend entro del insert me hace ruido, chequear que onda,
                         ##la ide me lo marcar en rojo.
-                        datagrams.insert(0, datagram_to_resend)
-                        datagrams_flying.remove(datagram_to_resend)
+
+                        if datagram_to_resend is not None:
+                            datagrams.insert(0, datagram_to_resend)
+                            datagrams_flying.remove(datagram_to_resend)
+
+
                         ack_repetitions = 0
 
 
