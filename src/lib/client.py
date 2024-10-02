@@ -22,7 +22,8 @@ class Client:
         self.selective_ack.start_client(file_name, TypeOfDatagram.HEADER_UPLOAD.value)
 
     def download(self, file_name):
-        self.stop_and_wait.start_client(file_name, TypeOfDatagram.HEADER_DOWNLOAD.value)
+        #self.stop_and_wait.start_client(file_name, TypeOfDatagram.HEADER_DOWNLOAD.value)
+        self.selective_ack.start_client(file_name, TypeOfDatagram.HEADER_DOWNLOAD.value)
 
     def close(self):
         self.socket.close()
