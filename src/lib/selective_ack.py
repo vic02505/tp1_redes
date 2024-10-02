@@ -1,6 +1,4 @@
 from socket import socket
-
-from astroid import Print
 from lib.sack_communications import TypeOfDatagram, DatagramDeserialized, Datagram, SACK_DATAGRAM_SIZE
 import lib.files_management as files_management
 
@@ -59,7 +57,7 @@ class SelectiveAck:
     def start_client(self, file_name, datagram_type):
         print(f"[Cliente - {self.address}] Inicializando SW para cliente")
         self.socket.settimeout(TIMEOUT_CLIENT)
-        if datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
+        if datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:             
             print(f"[Cliente - {self.address}] Accion a realizar: Carga de un archivo al servidor")
 
             # Armo el header UPLOAD
@@ -88,6 +86,8 @@ class SelectiveAck:
             ack_with_data = self.wait_ack(download_header)
             self.send_ack(ack_with_data.datagram_number)
 
+            self.socket.settimeout(None)
+            
             self.receiving_operation(ack_with_data.total_datagrams, ack_with_data.file_name)
         else:
             raise Exception("El primer mensaje no es un header")
@@ -163,17 +163,13 @@ class SelectiveAck:
 
             try:
                 if self.is_server:
-                    datagram_deserialized = DatagramDeserialized(self.queue.get())
+                    datagram_deserialized = DatagramDeserialized(self.queue.get(timeout = TIMEOUT_SERVER))
                 else:
-                    self.socket.settimeout(2)
                     datagram_deserialized = DatagramDeserialized(self.socket.recv(SACK_DATAGRAM_SIZE))
             except Exception as e:
-                print(f"Datagramas en vuelo {len(datagrams_flying)}")
-                print(f"No hay nada en el buffer {e}")
-
-                print("Datagrams volando")
-                for datagram in datagrams_flying :
-                    print(f"flying: {datagram.datagram_number}")
+                print(f"No recibi nada")
+                datagrams.insert(0, datagrams_flying[0])
+                datagrams_flying = datagrams_flying[1:]
                 continue
 
             if datagram_deserialized.datagram_type == TypeOfDatagram.SACK.value:
@@ -227,7 +223,6 @@ class SelectiveAck:
                 return 1
         return 0
 
-
     def get_sacks(self, received, total):
         sacks = []
         print("Received: ", received)
@@ -246,7 +241,6 @@ class SelectiveAck:
 
         return sacks[0:4]
 
-
     def get_next_ack_number(self, received_datagrams_numbers):
         next_ack_number = len(received_datagrams_numbers)
         for i in range(1, len(received_datagrams_numbers)):
@@ -256,7 +250,9 @@ class SelectiveAck:
         return next_ack_number
 
     def receiving_operation(self, total_datagrams, file_name):
+        # Guardo todo el contenido del archivo
         received_data = [None] * total_datagrams
+        # Guardo el numero de datagrama que recibi
         received_datagrams_numbers = []
         last_ack_number = 0
 
@@ -265,37 +261,43 @@ class SelectiveAck:
             if self.is_server:
                 datagram_deserialized = DatagramDeserialized(self.queue.get())
             else:
-                self.socket.setblocking(False)
-                try:
-                    datagram, address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
-                    datagram_deserialized = DatagramDeserialized(datagram)
-                except Exception as e:
-                    print(f"No hay nada en el buffer: {e}")
-                    continue
+                datagram, address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
+                datagram_deserialized = DatagramDeserialized(datagram)
 
-            print("recibio datagrama numero:", datagram_deserialized.datagram_number)
+            print("Recibio datagrama numero:", datagram_deserialized.datagram_number)
 
-            received_data[datagram_deserialized.datagram_number - 1] = datagram_deserialized.content
+            # En caso de haber recibido un datagrama que no habia recibido antes lo guardo y proceso
+            # Si ya lo habia recibido lo descarto.
             if datagram_deserialized.datagram_number not in received_datagrams_numbers:
+                received_data[datagram_deserialized.datagram_number - 1] = datagram_deserialized.content
                 received_datagrams_numbers.append(datagram_deserialized.datagram_number)
                 received_datagrams_numbers.sort()
-            print(f"Last ack number: {last_ack_number}", f"recibido: {datagram_deserialized.datagram_number}")
-            if last_ack_number + 1 == datagram_deserialized.datagram_number:
-                list_of_sacks = [[0,0],[0,0],[0,0],[0,0]]
-                amount_of_sacks = 0
-            else:
-                list_of_sacks = self.get_sacks(received_datagrams_numbers, total_datagrams)
-                amount_of_sacks = len(list_of_sacks)
-                self.fill_with_ceros(list_of_sacks)
-            print("Lista de sacks: ", list_of_sacks)
 
-            if list_of_sacks == [[0, 0], [0, 0], [0, 0], [0, 0]]:
-                last_ack_number = self.get_next_ack_number(received_datagrams_numbers)
-                self.send_sack(last_ack_number + 1, list_of_sacks, amount_of_sacks)
-                print("Last ack number: ", last_ack_number)
-            else:
-                print("No esta en orden, envio: ", last_ack_number + 1)
-                self.send_sack(last_ack_number + 1, list_of_sacks, amount_of_sacks)
+                print(f"Last ack number: {last_ack_number}", f"recibido: {datagram_deserialized.datagram_number}")
+                
+                # Cuando recibis todo en orden madnas una lista de sacks vacia 
+                if last_ack_number + 1 == datagram_deserialized.datagram_number:
+                    list_of_sacks = [[0,0],[0,0],[0,0],[0,0]]
+                    print("Lista de sacks: ", list_of_sacks)
+                    
+                    amount_of_sacks = 0
+                    
+                    last_ack_number = self.get_next_ack_number(received_datagrams_numbers)
+                    print("Last ack number: ", last_ack_number)
+                    
+                    self.send_sack(last_ack_number + 1, list_of_sacks, amount_of_sacks)
+                else:
+                    # En caso de no recibir todo en orden armo el sack
+                    list_of_sacks = self.get_sacks(received_datagrams_numbers, total_datagrams)
+                    print("Lista de sacks: ", list_of_sacks)
+
+                    amount_of_sacks = len(list_of_sacks)
+                    
+                    self.fill_with_ceros(list_of_sacks)
+                    
+                    print("No esta en orden, envio: ", last_ack_number + 1)
+                    self.send_sack(last_ack_number + 1, list_of_sacks, amount_of_sacks)
+                
         
         print(f"[SERVIDOR - Hilo #{self.address}] Creado con éxito el archivo {file_name}")
         files_management.create_new_file(received_data, file_name)
