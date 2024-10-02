@@ -1,5 +1,5 @@
 from socket import socket
-from lib.sack_communications import TypeOfDatagram, DatagramDeserialized, Datagram, SACK_DATAGRAM_SIZE
+from lib.sack_communications import TypeOfSackDatagram, SackDatagramDeserialized, SackDatagram, SACK_DATAGRAM_SIZE
 import lib.files_management as files_management
 
 TIMEOUT_CLIENT = 0.1
@@ -29,12 +29,12 @@ class SelectiveAck:
 
     # Inicio server
     def start_server(self):
-        deserialized_datagram = DatagramDeserialized(self.queue.get())
+        deserialized_datagram = SackDatagramDeserialized(self.queue.get())
         print(f"[SERVIDOR - Hilo #{self.address}] Recibio mensaje de: {self.address}")
 
-        if deserialized_datagram.datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
+        if deserialized_datagram.datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value:
             self._start_server_upload(deserialized_datagram)
-        elif deserialized_datagram.datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
+        elif deserialized_datagram.datagram_type == TypeOfSackDatagram.HEADER_DOWNLOAD.value:
             self._start_server_download(deserialized_datagram)
         else:
             raise Exception("El primer mensaje no es un header")
@@ -45,8 +45,8 @@ class SelectiveAck:
 
         print(f"[SERVIDOR - Hilo #{self.address}] Inicio de descarga de archivo: {file_name}")
 
-        total_datagrams = files_management.get_count_of_datagrams(file_name)
-        ack_with_data = Datagram.create_download_header_server(file_name, file_size, total_datagrams)
+        total_datagrams = files_management.get_count_of_datagrams_sack(file_name)
+        ack_with_data = SackDatagram.create_download_header_server(file_name, file_size, total_datagrams)
 
         self.socket.sendto(ack_with_data.get_datagram_bytes(), self.address)
         self.wait_ack(ack_with_data)
@@ -63,16 +63,16 @@ class SelectiveAck:
     def start_client(self, file_name, datagram_type):
         print(f"[Cliente - {self.address}] Inicializando SW para cliente")
         self.socket.settimeout(TIMEOUT_CLIENT)
-        if datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:             
+        if datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value:
             self._start_client_upload(file_name)
-        elif datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
+        elif datagram_type == TypeOfSackDatagram.HEADER_DOWNLOAD.value:
             self._start_client_download(file_name)
         else:
             raise Exception("El primer mensaje no es un header")
 
     def _start_client_download(self, file_name):
         # Armo el header DOWNLOAD
-        download_header = Datagram.create_download_header_client(file_name)
+        download_header = SackDatagram.create_download_header_client(file_name)
 
         # Envio el header
         self.socket.sendto(download_header.get_datagram_bytes(), self.address)
@@ -89,9 +89,9 @@ class SelectiveAck:
 
             # Armo el header UPLOAD
         file_size = files_management.get_file_size(file_name)
-        total_datagrams = files_management.get_count_of_datagrams(file_name)
+        total_datagrams = files_management.get_count_of_datagrams_sack(file_name)
         print(f"EL NUMERO DE DATAGRAMAS ES {total_datagrams}")
-        upload_header = Datagram.create_upload_header_client(file_name, file_size, total_datagrams)
+        upload_header = SackDatagram.create_upload_header_client(file_name, file_size, total_datagrams)
 
             # Envio el header
         print("ENVIO PETICION DE DESCARGA")
@@ -109,10 +109,10 @@ class SelectiveAck:
         while True:
             try:
                 if self.is_server:
-                    ack_deserialized = DatagramDeserialized(self.queue.get(timeout=TIMEOUT_SERVER))
+                    ack_deserialized = SackDatagramDeserialized(self.queue.get(timeout=TIMEOUT_SERVER))
                 else:
                     ack, client_address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
-                    ack_deserialized = DatagramDeserialized(ack)
+                    ack_deserialized = SackDatagramDeserialized(ack)
                 if ack_deserialized.datagram_number == datagram.datagram_number:
                     print(f"[Cliente - {self.address}] Recibi ACK correcto")
                     return ack_deserialized
@@ -125,7 +125,7 @@ class SelectiveAck:
     # Send ack: envia un ack con un ack_number
     def send_ack(self, ack_number):
         # Envio el ack
-        ack_datagram = Datagram.create_ack(ack_number)
+        ack_datagram = SackDatagram.create_ack(ack_number)
         bytes = ack_datagram.get_datagram_bytes()
         self.socket.sendto(bytes, self.address)
 
@@ -133,7 +133,7 @@ class SelectiveAck:
     def send_sack(self, ack_number, list_of_sacks, amount_of_sacks):
         # Envio el sack
         print(f"enviar ack: numero_ack-{ack_number}, cantidad_sacks-{amount_of_sacks} ,lista_sacks-{list_of_sacks}")
-        sack_datagram = Datagram.create_sack(ack_number, amount_of_sacks, list_of_sacks)
+        sack_datagram = SackDatagram.create_sack(ack_number, amount_of_sacks, list_of_sacks)
         bytes = sack_datagram.get_datagram_bytes()
         self.socket.sendto(bytes, self.address)
 
@@ -157,7 +157,7 @@ class SelectiveAck:
 
         # Obtenemos los datagramas
         # FIX datagram number o binario
-        datagrams = files_management.get_datagrams(file_contents)
+        datagrams = files_management.get_datagrams_for_sack(file_contents)
         datagrams_flying = []
         window_size_remaining = self.window_size
         last_ack_number = 0
@@ -177,9 +177,9 @@ class SelectiveAck:
             datagram_deserialized = None
             try:
                 if self.is_server:
-                    datagram_deserialized = DatagramDeserialized(self.queue.get(timeout = TIMEOUT_SERVER))
+                    datagram_deserialized = SackDatagramDeserialized(self.queue.get(timeout = TIMEOUT_SERVER))
                 else:
-                    datagram_deserialized = DatagramDeserialized(self.socket.recv(SACK_DATAGRAM_SIZE))
+                    datagram_deserialized = SackDatagramDeserialized(self.socket.recv(SACK_DATAGRAM_SIZE))
             except Exception as _:
                 print(f"TIME OUT, NO RECIBI UNA PUTA MIERDA")
                 for datagram in datagrams_flying:
@@ -190,7 +190,7 @@ class SelectiveAck:
                     window_size_remaining += 1
                 continue
 
-            if datagram_deserialized.datagram_type == TypeOfDatagram.SACK.value:
+            if datagram_deserialized.datagram_type == TypeOfSackDatagram.SACK.value:
                 print(f"SACK {datagram_deserialized.datagram_number} recibido ")
                 # Manejo el ack repetido
                 if last_ack_number != datagram_deserialized.datagram_number:
@@ -232,14 +232,16 @@ class SelectiveAck:
                             window_size_remaining += 1
 
     # TODO modificar el return para que devuelva el windows size directamente
-    def remove_datagram_from_flying(self, datagrams_flying, datagram_deserialized):
+    @staticmethod
+    def remove_datagram_from_flying(datagrams_flying, datagram_deserialized):
         for datagram in datagrams_flying:
             if datagram.datagram_number == datagram_deserialized.datagram_number - 1:
                 datagrams_flying.remove(datagram)
                 return 1
         return 0
 
-    def get_sacks(self, received, total):
+    @staticmethod
+    def get_sacks(received, total):
         sacks = []
         print("Received: ", received)
         # Empezar a recorrer los datagramas recibidos
@@ -257,7 +259,8 @@ class SelectiveAck:
         print("Lista de sacks: ", sacks)
         return sacks[0:4]
 
-    def get_next_ack_number(self, received_datagrams_numbers):
+    @staticmethod
+    def get_next_ack_number(received_datagrams_numbers):
         next_ack_number = len(received_datagrams_numbers)
         for i in range(1, len(received_datagrams_numbers)):
             if (received_datagrams_numbers[i] - received_datagrams_numbers[i-1]) > 1:
@@ -276,10 +279,10 @@ class SelectiveAck:
             datagram_deserialized = -1
             aux += 1
             if self.is_server:
-                datagram_deserialized = DatagramDeserialized(self.queue.get())
+                datagram_deserialized = SackDatagramDeserialized(self.queue.get())
             else:
                 datagram, address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
-                datagram_deserialized = DatagramDeserialized(datagram)
+                datagram_deserialized = SackDatagramDeserialized(datagram)
 
             if aux % 3 == 0:
                 print("entro al contador")

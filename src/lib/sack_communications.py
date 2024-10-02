@@ -1,7 +1,7 @@
 import struct
 from enum import Enum
 
-class TypeOfDatagram(Enum):
+class TypeOfSackDatagram(Enum):
     ACK = 1
     HEADER_DOWNLOAD = 2
     HEADER_UPLOAD = 3
@@ -12,7 +12,7 @@ N = 256
 SACK_FRAGMENT_SIZE = 1343
 SACK_DATAGRAM_SIZE = 1496
 
-class DatagramDeserialized:
+class SackDatagramDeserialized:
 
     def __init__(self, bytes_flow):
         self.datagram_type = struct.unpack('<B', bytes_flow[0:1])[0] # 1 byte
@@ -33,7 +33,7 @@ class DatagramDeserialized:
 
 
 
-class Datagram():
+class SackDatagram():
     def __init__(self, datagram_type, file_name, file_size, datagram_number, sacks_content, sack_number, total_datagrams, datagram_size, content):
         self.datagram_type = datagram_type  # Defino que tipo de mensaje es (ACK, HS_DOWNLOAD, HS_UPLOAD, CONTENT)
         self.file_name = file_name  # Nombre del archivo para guardar en servidor o cliente
@@ -58,33 +58,33 @@ class Datagram():
 
     @classmethod
     def create_ack(cls, ack_number):
-        return cls(datagram_type=TypeOfDatagram.ACK.value, file_name="", file_size=0, datagram_number=ack_number, sacks_content=[[0,0],[0,0],[0,0],[0,0]],
+        return cls(datagram_type=TypeOfSackDatagram.ACK.value, file_name="", file_size=0, datagram_number=ack_number, sacks_content=[[0,0],[0,0],[0,0],[0,0]],
                    sack_number=0, total_datagrams=0, datagram_size=0, content=b"")
     
     @classmethod
     def create_sack(cls, ack_number, sack_number, sacks_content):
-        return cls(datagram_type=TypeOfDatagram.SACK.value, file_name="", file_size=0, datagram_number=ack_number, sacks_content=sacks_content,
+        return cls(datagram_type=TypeOfSackDatagram.SACK.value, file_name="", file_size=0, datagram_number=ack_number, sacks_content=sacks_content,
                    sack_number = sack_number, total_datagrams=0, datagram_size=0, content=b"")
 
     @classmethod
     def create_download_header_client(cls, file_name):
-        return cls(datagram_type=TypeOfDatagram.HEADER_DOWNLOAD.value, file_name=file_name, file_size=0,
+        return cls(datagram_type=TypeOfSackDatagram.HEADER_DOWNLOAD.value, file_name=file_name, file_size=0,
                    datagram_number=0, sacks_content = [[0,0],[0,0],[0,0],[0,0]], sack_number = 0, total_datagrams=0, datagram_size=0, content=b"")
 
     @classmethod
     def create_upload_header_client(cls, file_name, file_size, total_datagrams):
-        return cls(datagram_type=TypeOfDatagram.HEADER_UPLOAD.value, file_name=file_name, file_size=file_size,
+        return cls(datagram_type=TypeOfSackDatagram.HEADER_UPLOAD.value, file_name=file_name, file_size=file_size,
                    datagram_number=0, sacks_content = [[0,0],[0,0],[0,0],[0,0]], sack_number = 0, total_datagrams=total_datagrams, datagram_size=0, content=b"")
 
     @classmethod
     def create_content(cls, datagram_number, total_datagrams, file_name,
                        datagram_size, content):
-        return cls(datagram_type=TypeOfDatagram.CONTENT.value, file_name=file_name, file_size=0,
+        return cls(datagram_type=TypeOfSackDatagram.CONTENT.value, file_name=file_name, file_size=0,
                    datagram_number=datagram_number, sacks_content=[[0,0],[0,0],[0,0],[0,0]], sack_number=0, total_datagrams=total_datagrams,
                    datagram_size=datagram_size, content=content)
 
     @classmethod
     def create_download_header_server(cls, file_name, file_size, total_datagrams):
-        return cls(datagram_type=TypeOfDatagram.HEADER_DOWNLOAD.value, file_name=file_name, file_size=file_size,
+        return cls(datagram_type=TypeOfSackDatagram.HEADER_DOWNLOAD.value, file_name=file_name, file_size=file_size,
                    datagram_number=0, sacks_content = [[0,0],[0,0],[0,0],[0,0]], sack_number=0, total_datagrams=total_datagrams, datagram_size=0, content=b"")
 
