@@ -2,8 +2,8 @@ from socket import socket
 from lib.sack_communications import TypeOfDatagram, DatagramDeserialized, Datagram, SACK_DATAGRAM_SIZE
 import lib.files_management as files_management
 
-TIMEOUT_CLIENT = 0.5
-TIMEOUT_SERVER = 0.5
+TIMEOUT_CLIENT = 0.1
+TIMEOUT_SERVER = 0.1
 WINDOWS_SIZE = 5
 MAX_ACK_REPETITIONS = 2
 
