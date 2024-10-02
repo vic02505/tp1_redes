@@ -33,64 +33,75 @@ class SelectiveAck:
         print(f"[SERVIDOR - Hilo #{self.address}] Recibio mensaje de: {self.address}")
 
         if deserialized_datagram.datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:
-            file_name = deserialized_datagram.file_name
-            total_datagrams = deserialized_datagram.total_datagrams
-            datagram_number = deserialized_datagram.datagram_number
-            self.send_ack(datagram_number)
-            self.receiving_operation(total_datagrams, file_name)
+            self._start_server_upload(deserialized_datagram)
         elif deserialized_datagram.datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
-            file_name = deserialized_datagram.file_name
-            file_size = files_management.get_file_size(file_name)
-
-            print(f"[SERVIDOR - Hilo #{self.address}] Inicio de descarga de archivo: {file_name}")
-
-            total_datagrams = files_management.get_count_of_datagrams(file_name)
-            ack_with_data = Datagram.create_download_header_server(file_name, file_size, total_datagrams)
-
-            self.socket.sendto(ack_with_data.get_datagram_bytes(), self.address)
-            self.wait_ack(ack_with_data)
-            self.sending_operation(file_name)
+            self._start_server_download(deserialized_datagram)
         else:
             raise Exception("El primer mensaje no es un header")
+
+    def _start_server_download(self, deserialized_datagram):
+        file_name = deserialized_datagram.file_name
+        file_size = files_management.get_file_size(file_name)
+
+        print(f"[SERVIDOR - Hilo #{self.address}] Inicio de descarga de archivo: {file_name}")
+
+        total_datagrams = files_management.get_count_of_datagrams(file_name)
+        ack_with_data = Datagram.create_download_header_server(file_name, file_size, total_datagrams)
+
+        self.socket.sendto(ack_with_data.get_datagram_bytes(), self.address)
+        self.wait_ack(ack_with_data)
+        self.sending_operation(file_name)
+
+    def _start_server_upload(self, deserialized_datagram):
+        file_name = deserialized_datagram.file_name
+        total_datagrams = deserialized_datagram.total_datagrams
+        datagram_number = deserialized_datagram.datagram_number
+        self.send_ack(datagram_number)
+        self.receiving_operation(total_datagrams, file_name)
 
     # Inicio de client
     def start_client(self, file_name, datagram_type):
         print(f"[Cliente - {self.address}] Inicializando SW para cliente")
         self.socket.settimeout(TIMEOUT_CLIENT)
         if datagram_type == TypeOfDatagram.HEADER_UPLOAD.value:             
-            print(f"[Cliente - {self.address}] Accion a realizar: Carga de un archivo al servidor")
-
-            # Armo el header UPLOAD
-            file_size = files_management.get_file_size(file_name)
-            total_datagrams = files_management.get_count_of_datagrams(file_name)
-            print(f"EL NUMERO DE DATAGRAMAS ES {total_datagrams}")
-            upload_header = Datagram.create_upload_header_client(file_name, file_size, total_datagrams)
-
-            # Envio el header
-            print("ENVIO PETICION DE DESCARGA")
-            self.socket.sendto(upload_header.get_datagram_bytes(), self.address)
-            # Espero el ACK
-            print("ESPERO ACK")
-            self.wait_ack(upload_header)
-            print("RECIBI ACK")
-            # Comienzo a enviar el file
-            self.sending_operation(file_name)
+            self._start_client_upload(file_name)
         elif datagram_type == TypeOfDatagram.HEADER_DOWNLOAD.value:
-            # Armo el header DOWNLOAD
-            download_header = Datagram.create_download_header_client(file_name)
-
-            # Envio el header
-            self.socket.sendto(download_header.get_datagram_bytes(), self.address)
-
-            # Espero el ACK
-            ack_with_data = self.wait_ack(download_header)
-            self.send_ack(ack_with_data.datagram_number)
-
-            self.socket.settimeout(None)
-            
-            self.receiving_operation(ack_with_data.total_datagrams, ack_with_data.file_name)
+            self._start_client_download(file_name)
         else:
             raise Exception("El primer mensaje no es un header")
+
+    def _start_client_download(self, file_name):
+        # Armo el header DOWNLOAD
+        download_header = Datagram.create_download_header_client(file_name)
+
+        # Envio el header
+        self.socket.sendto(download_header.get_datagram_bytes(), self.address)
+
+        # Espero el ACK
+        ack_with_data = self.wait_ack(download_header)
+        self.send_ack(ack_with_data.datagram_number)
+
+        self.socket.settimeout(None)
+        self.receiving_operation(ack_with_data.total_datagrams, ack_with_data.file_name)
+
+    def _start_client_upload(self, file_name):
+        print(f"[Cliente - {self.address}] Accion a realizar: Carga de un archivo al servidor")
+
+            # Armo el header UPLOAD
+        file_size = files_management.get_file_size(file_name)
+        total_datagrams = files_management.get_count_of_datagrams(file_name)
+        print(f"EL NUMERO DE DATAGRAMAS ES {total_datagrams}")
+        upload_header = Datagram.create_upload_header_client(file_name, file_size, total_datagrams)
+
+            # Envio el header
+        print("ENVIO PETICION DE DESCARGA")
+        self.socket.sendto(upload_header.get_datagram_bytes(), self.address)
+            # Espero el ACK
+        print("ESPERO ACK")
+        self.wait_ack(upload_header)
+        print("RECIBI ACK")
+            # Comienzo a enviar el file
+        self.sending_operation(file_name)
 
     # Wait ack: espera que llegue un ack, si no llega, reenvia el datagrama
     def wait_ack(self, datagram):
@@ -289,8 +300,6 @@ class SelectiveAck:
 
             # Cuando recibis todo en orden madnas una lista de sacks vacia
             if last_ack_number + 1 == datagram_deserialized.datagram_number:
-
-
                 last_ack_number = self.get_next_ack_number(received_datagrams_numbers)
                 print("Last ack number: ", last_ack_number)
                 list_of_sacks = self.get_sacks(received_datagrams_numbers, total_datagrams)
