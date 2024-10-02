@@ -15,7 +15,7 @@ class Client:
     def __init__(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         #self.stop_and_wait = StopAndWait.create_stop_and_wait_for_client(self.socket,("127.0.0.1", PORT))
-        self.selective_ack = SelectiveAck.create_selective_ack_for_client(("127.0.0.1", PORT), self.socket)
+        self.selective_ack = SelectiveAck.create_selective_ack_for_client(("10.0.0.1", PORT), self.socket)
 
     def upload(self, file_name):
         #self.stop_and_wait.start_client(file_name, TypeOfSwDatagram.HEADER_UPLOAD.value)

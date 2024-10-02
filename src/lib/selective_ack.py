@@ -284,10 +284,6 @@ class SelectiveAck:
                 datagram, address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
                 datagram_deserialized = SackDatagramDeserialized(datagram)
 
-            if aux % 3 == 0:
-                print("entro al contador")
-                continue
-
             print("Recibio datagrama numero:", datagram_deserialized.datagram_number)
 
             # En caso de haber recibido un datagrama que no habia recibido antes lo guardo y proceso

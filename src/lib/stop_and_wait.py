@@ -4,7 +4,7 @@ import sys
 from importlib.metadata import files
 from socket import socket
 from lib.sw_communications import TypeOfSwDatagram, SwDatagramDeserialized, SwDatagram, SW_FRAGMENT_SIZE, SW_DATAGRAM_SIZE
-import src.lib.files_management as files_management
+import lib.files_management as files_management
 
 TIMEOUT_CLIENT = 0.1
 TIMEOUT_SERVER = 0.1
