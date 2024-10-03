@@ -48,6 +48,8 @@ Opciones:
 python3 download.py -H 192.168.1.100 -p 8080 -s /ruta/al/archivo.txt -n archivo.txt -a sack
 ```
 
+--- 
+
 ## Ejecucion Servidor
 
 ```bash
