@@ -9,6 +9,9 @@
 
 ## Ejecucion Cliente
 
+**NOTA: el flag -s no se encuentra implementado, usar por defecto el flag -n con alguno de los nombres de archivos contenidos dentro de del directorio archivos_de_prueba. Lo mismo aplica para el caso de especificar del destino de la descarga (operación download), no hay que especificar la ruta de descarga.**
+
+
 ### Upload
 ```bash
 python upload [-h] [-v|-q] [-H ADDR ] [-p PORT] [-s FILEPATH] [-n FILENAME] [-a ALGORITHM]
@@ -26,6 +29,9 @@ Opciones:
 | `-s`, `--src` | Ruta del archivo fuente que se desea subir.  |
 | `-n`, `--name` | Nombre del archivo.                         |
 | `-a`, `--algorithm` | Algoritmo elegido (sw or sack)         |
+
+
+
 #### Ejemplo de uso
 ```bash
 python3 upload.py -H 192.168.1.100 -p 8080 -s /ruta/al/archivo.txt -n archivo.txt -a sack
