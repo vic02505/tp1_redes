@@ -271,6 +271,7 @@ class SelectiveAck:
         received_datagrams_numbers = []
         # Ultimo ack que mande 
         last_ack_number = 1
+
         while len(received_datagrams_numbers) < total_datagrams:
             datagram_deserialized = -1
             if self.is_server:
@@ -296,7 +297,7 @@ class SelectiveAck:
             self.send_sack(last_ack_number, list_of_sacks)
 
         for i in range(0,14):
-            self.send_sack(last_ack_number, list_of_sacks)
+            self.send_sack(last_ack_number, [])
     
         print("--------------------------------------------------------------------------")
         print(f"[SERVIDOR - Hilo #{self.address}] Creado con éxito el archivo {file_name}")
