@@ -1,5 +1,12 @@
 # Trabajo Practico 1 - Redes
 
+## Integrantes
+- GALIÁN, Tomás Ezequiel - 104354
+- SAEZ, Edgardo Francisco - 104896      
+- PUJATO, Iñaki - 109131 
+- LARDIEZ, Mateo - 107992 
+- ZACARIAS, Victor - 107080 
+
 ## Ejecucion Cliente
 
 ### Upload
