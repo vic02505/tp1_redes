@@ -1,7 +1,6 @@
-from socket import socket
 from lib.sack_communications import TypeOfSackDatagram, SackDatagramDeserialized, SackDatagram, SACK_DATAGRAM_SIZE
 import lib.files_management as files_management
-
+import  socket as socket
 # Delete import
 import random
 
@@ -281,6 +280,10 @@ class SelectiveAck:
                 datagram_deserialized = SackDatagramDeserialized(datagram)
 
             #Se perdio la confirmacion del ack de descarga, lo reenvio de vuelta.
+            # TODO: Se puede arreglar metiendo este if en un while que si entra al if, se envie el mismo mensaje de
+            #       confirmacion de la operacion. Se itera hasta que se recibe el ack. Del otro lado tambien debe haber
+            #       un while con condicion de corte de que si sigue llegando el mismo paquete de confirmacion, se vuelva
+            #       a enviar el ack.
             if ((datagram_deserialized.datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value) or
                     (datagram_deserialized.datagram_type == TypeOfSackDatagram.HEADER_DOWNLOAD.value)):
                 self.send_ack(0)
