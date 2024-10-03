@@ -280,7 +280,9 @@ class SelectiveAck:
                 datagram, address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
                 datagram_deserialized = SackDatagramDeserialized(datagram)
 
-            if datagram_deserialized.datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value:
+            #Se perdio la confirmacion del ack de descarga, lo reenvio de vuelta.
+            if ((datagram_deserialized.datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value) or
+                    (datagram_deserialized.datagram_type == TypeOfSackDatagram.HEADER_DOWNLOAD.value)):
                 self.send_ack(0)
                 continue
 
