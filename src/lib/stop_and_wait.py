@@ -1,10 +1,9 @@
-import math
-import queue
-import sys
-from importlib.metadata import files
-from socket import socket
-from lib.sw_communications import TypeOfSwDatagram, SwDatagramDeserialized, SwDatagram, SW_FRAGMENT_SIZE, SW_DATAGRAM_SIZE
+import time
+
+from lib.sw_communications import TypeOfSwDatagram, SwDatagramDeserialized, SwDatagram, SW_DATAGRAM_SIZE
 import lib.files_management as files_management
+import logging
+
 
 TIMEOUT_CLIENT = 0.1
 TIMEOUT_SERVER = 0.1
@@ -31,56 +30,62 @@ class StopAndWait:
     # Inicio server
     def start_server(self):
         deserialized_datagram = SwDatagramDeserialized(self.queue.get())
-        print(f"[SERVIDOR - Hilo #{self.address}] Recibio mensaje de: {self.address}")
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Iniciando conexión con el cliente"))
 
         if deserialized_datagram.datagram_type == TypeOfSwDatagram.HEADER_UPLOAD.value:
             file_name = deserialized_datagram.file_name
             total_datagrams = deserialized_datagram.total_datagrams
             datagram_number = deserialized_datagram.datagram_number
+            logging.info(print(f"[SERVIDOR - Hilo #{self.address}] El cliente solicita cargar el archivo: {file_name}"))
             self.send_ack(datagram_number)
+            logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Solicitud de carga aceptada"))
             self.receive_server_file(total_datagrams, file_name, datagram_number)
         elif deserialized_datagram.datagram_type == TypeOfSwDatagram.HEADER_DOWNLOAD.value:
             file_name = deserialized_datagram.file_name
             file_size = files_management.get_file_size(file_name)
 
-            print(f"[SERVIDOR - Hilo #{self.address}] Inicio de descarga de archivo: {file_name}")
+            logging.info(print(f"[SERVIDOR - Hilo #{self.address}] El cliente desea descargar el archivo: {file_name}"))
 
             total_datagrams = files_management.get_count_of_datagrams_sw(file_name)
             ack_with_data = SwDatagram.create_download_header_server(file_name, file_size, total_datagrams)
             self.socket.sendto(ack_with_data.get_datagram_bytes(), self.address)
             self.wait_ack(ack_with_data)
+            logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Solicitud de descarga aceptada"))
             self.send_server_file(file_name)
         else:
             raise Exception("El primer mensaje no es un header")
 
     # Inicio de client
     def start_client(self, file_name, datagram_type):
-        print(f"[Cliente - {self.address}] Inicializando SW para cliente")
         self.socket.settimeout(TIMEOUT_CLIENT)
         if datagram_type == TypeOfSwDatagram.HEADER_UPLOAD.value:
-            print(f"[Cliente - {self.address}] Accion a realizar: Carga de un archivo al servidor")
-
             # Armo el header UPLOAD
             file_size = files_management.get_file_size(file_name)
             total_datagrams = files_management.get_count_of_datagrams_sw(file_name)
-            print(f"EL NUMERO DE DATAGRAMAS ES {total_datagrams}")
             upload_header = SwDatagram.create_upload_header_client(file_name, file_size, total_datagrams)
 
             # Envio el header
             self.socket.sendto(upload_header.get_datagram_bytes(), self.address)
+            logging.info(print("[Cliente] Solicitud de carga de archivo enviada al servidor "))
             # Espero el ACK
             self.wait_ack(upload_header)
+            logging.info(print("[Cliente] Solicitud de carga de archivo aceptada por el servidor"))
             # Comienzo a enviar el file
             self.send_client_file(file_name)
         elif datagram_type == TypeOfSwDatagram.HEADER_DOWNLOAD.value:
             # Armo el header DOWNLOAD
+
             download_header = SwDatagram.create_download_header_client(file_name)
 
             # Envio el header
             self.socket.sendto(download_header.get_datagram_bytes(), self.address)
 
+            logging.info(print(["[Cliente] Solucitud de descarga de archivo enviada al servidor"]))
+
             # Espero el ACK
             ack_with_data = self.wait_ack(download_header)
+
+            logging.info(print(["[Cliente] Solucitud de descarga de archivo aceptada por el servidor"]))
 
             # Send ack
             self.send_ack(ack_with_data.datagram_number)
@@ -103,13 +108,10 @@ class StopAndWait:
                     ack, client_address = self.socket.recvfrom(SW_DATAGRAM_SIZE)
                     ack_deserialized = SwDatagramDeserialized(ack)
                 if ack_deserialized.datagram_number == datagram.datagram_number:
-                    print(f"[Cliente - {self.address}] Recibi ACK correcto")
                     return ack_deserialized
             # Excepción por timeout
             except Exception:
-                print(f"[Cliente - {self.address}] Timeout alcanzado esperando ACK")
                 self.socket.sendto(datagram.get_datagram_bytes(), self.address)
-                print(f"[Cliente - {self.address}] Datagrama enviado nuevamente")
 
     # Send ack: envia un ack y espera que llegue un paquete distinto al ack_number
     def send_ack(self, ack_number):
@@ -130,41 +132,62 @@ class StopAndWait:
         # FIX datagram number o binario
         datagrams =  files_management.get_datagrams_for_sw(file_contents)
 
+        logging.info("[CLIENTE] Iniciando envío de archivo")
+
+        begin = time.time()
+
         # Enviamos los datagramas
         for datagram in datagrams:
-            print(f"[Cliente - {self.address}] Enviando datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
             self.socket.sendto(datagram.get_datagram_bytes(), self.address)
             self.wait_ack(datagram)
 
+        end = time.time()
+        sending_time = end - begin
+        logging.info(f"[CLIENTE] Archivo enviado con éxito en {sending_time}ms")
+
+
     def receive_server_file(self, total_datagrams, file_name, datagram_number):
         received_data = []
+
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Iniciando recepción de archivo"))
+        begin = time.time()
+
         for i in range(1, total_datagrams + 1):
             datagram_deserialized = SwDatagramDeserialized(self.queue.get())
             while i != datagram_deserialized.datagram_number:
-                print(f"[SERVIDOR - Hilo #{self.address}] Ya recibí este datagrama  {datagram_deserialized.datagram_number}")
                 self.send_ack(datagram_deserialized.datagram_number)
                 datagram_deserialized = SwDatagramDeserialized(self.queue.get())
             received_data.append(datagram_deserialized.content)
             self.send_ack(datagram_deserialized.datagram_number)
 
-        print(f"[SERVIDOR - Hilo #{self.address}] Creado con éxito el archivo {file_name}")
+        end = time.time()
+        receiving_time = end - begin
+
         files_management.create_new_file(received_data, file_name)
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Recibido con éxito el archivo {file_name} en " 
+                           f"{receiving_time}ms"))
 
     # Operaciones para el DOWNLOAD
     def recive_client_file(self, total_datagrams, file_name):
         received_data = []
+
+        logging.info(print("[CLIENTE] Iniciando recepción de archivo"))
+        begin = time.time()
+
         for i in range(1, total_datagrams + 1):
             # Aca falta un try catch  (para mi no)
             datagram_deserialized = SwDatagramDeserialized(self.socket.recv(SW_DATAGRAM_SIZE))
             while i != datagram_deserialized.datagram_number:
-                print(f"[Cliente - {self.address}] Ya recibí este datagrama  {datagram_deserialized.datagram_number}")
                 self.send_ack(datagram_deserialized.datagram_number)
                 datagram_deserialized = SwDatagramDeserialized(self.socket.recv(SW_DATAGRAM_SIZE))
             received_data.append(datagram_deserialized.content)
             self.send_ack(datagram_deserialized.datagram_number)
 
-        print(f"[Cliente - {self.address}] Descarga realizada con éxito")
+        end = time.time()
+        receiving_time = end - begin
+
         files_management.create_new_file(received_data, file_name)
+        logging.info(print(f"[Cliente] Descarga realizada con éxito en {receiving_time}ms"))
 
     def send_server_file(self, file_name):
         # Busca el archivo.
@@ -176,8 +199,14 @@ class StopAndWait:
         # Obtenemos los datagramas
         datagrams = files_management.get_datagrams_for_sw(file_contents)
 
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Iniciando envío de archivo"))
+        begin = time.time()
+
         # Enviamos los datagramas
         for datagram in datagrams:
-            print(f"[SERVIDOR - Hilo #{self.address}] Datagrama {datagram.datagram_number} de " f"{datagram.total_datagrams}")
             self.socket.sendto(datagram.get_datagram_bytes(), self.address)
             self.wait_ack(datagram)
+
+        end = time.time()
+        sending_time = end - begin
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Archivo enviado con éxito en {sending_time}ms"))

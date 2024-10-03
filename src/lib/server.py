@@ -8,14 +8,14 @@ from lib.stop_and_wait import StopAndWait
 from lib.selective_ack import SelectiveAck
 
 class Server:
-    def __init__(self, host, port):
+    def __init__(self, host, port, algorithm):
         self.host = host
         self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.clients = {}
         self.queues = {}
         self.running = True
-        self.protocolo = "Stop and Wait"
+        self.algorithm = algorithm
 
     def start(self):
         try:
@@ -41,7 +41,7 @@ class Server:
                     new_client_queue = queue.Queue()
                     self.queues[client_address] = new_client_queue
 
-                    new_client_thread = threading.Thread(target=client_thread, args=(client_address, new_client_queue))
+                    new_client_thread = threading.Thread(target=self.client_thread, args=(client_address, new_client_queue))
                     
                     self.clients[client_address] = new_client_thread
                     
@@ -54,10 +54,12 @@ class Server:
             except Exception as e:
                 print(e)
 
-def client_thread(address, client_queue):
-    print(f"[SERVIDOR - Hilo #{address}] Comienza a correr el thread del cliente")
-    socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    selective_ack = SelectiveAck.create_selective_ack_for_server(socket_client, address, client_queue)
-    #stop_and_wait =  StopAndWait.create_stop_and_wait_for_server(socket_client, address, client_queue)
-    #stop_and_wait.start_server()
-    selective_ack.start_server()
+    def client_thread(self, address, client_queue):
+        print(f"[SERVIDOR - Hilo #{address}] Comienza a correr el thread del cliente")
+        socket_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if self.algorithm == "sw":
+            stop_and_wait =  StopAndWait.create_stop_and_wait_for_server(socket_client, address, client_queue)
+            stop_and_wait.start_server()
+        elif self.algorithm == "sack":
+            selective_ack = SelectiveAck.create_selective_ack_for_server(socket_client, address, client_queue)
+            selective_ack.start_server()

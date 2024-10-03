@@ -1,8 +1,12 @@
 from lib.sack_communications import TypeOfSackDatagram, SackDatagramDeserialized, SackDatagram, SACK_DATAGRAM_SIZE
 import lib.files_management as files_management
+import logging
+import time
 import  socket as socket
 # Delete import
 import random
+
+from reportlab.lib.pagesizes import elevenSeventeen
 
 TIMEOUT_CLIENT = 0.1
 TIMEOUT_SERVER = 0.1
@@ -25,14 +29,14 @@ class SelectiveAck:
                    is_server=True)
 
     @classmethod
-    def create_selective_ack_for_client(cls, destination_address, socket):
+    def create_selective_ack_for_client(cls, socket, destination_address):
         return cls(socket=socket, destination_address=destination_address, messages_queue=None,
                    is_server=False)
 
     # Inicio server
     def start_server(self):
         deserialized_datagram = SackDatagramDeserialized(self.queue.get())
-        print(f"[SERVIDOR - Hilo #{self.address}] Recibio mensaje de: {self.address}")
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Recibio mensaje de: {self.address}"))
 
         if deserialized_datagram.datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value:
             self._start_server_upload(deserialized_datagram)
@@ -45,7 +49,7 @@ class SelectiveAck:
         file_name = deserialized_datagram.file_name
         file_size = files_management.get_file_size(file_name)
 
-        print(f"[SERVIDOR - Hilo #{self.address}] Iniciando descarga del archivo: {file_name}")
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Iniciando descarga del archivo: {file_name}"))
 
         total_datagrams = files_management.get_count_of_datagrams_sack(file_name)
         ack_with_data = SackDatagram.create_download_header_server(file_name, file_size, total_datagrams)
@@ -63,16 +67,17 @@ class SelectiveAck:
 
     # Inicio de client
     def start_client(self, file_name, datagram_type):
-        print(f"[Cliente] Iniciando conexion con el servidor: {self.address}")
+        logging.info(print(f"[Cliente] Iniciando conexion con el servidor: {self.address}"))
         self.socket.settimeout(TIMEOUT_CLIENT)
         if datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value:
             self._start_client_upload(file_name)
         elif datagram_type == TypeOfSackDatagram.HEADER_DOWNLOAD.value:
             self._start_client_download(file_name)
         else:
-            raise Exception(f"[Cliente - {self.address}] El primer mensaje no es del tipo esperado (HEADER)")
+            raise Exception("[Cliente] El primer mensaje no es del tipo esperado (HEADER)")
 
     def _start_client_download(self, file_name):
+        logging.info("[Cliente] Se desea descargar un archivo del servidor")
         # Armo el header DOWNLOAD
         download_header = SackDatagram.create_download_header_client(file_name)
 
@@ -80,30 +85,31 @@ class SelectiveAck:
         self.socket.sendto(download_header.get_datagram_bytes(), self.address)
 
         # Espero el ACK
-        print(f"[Cliente] Esperando a que el servidor acepte la conexión")
+        logging.info("[Cliente] Esperando a que el servidor acepte la conexión")
         ack_with_data = self.wait_ack(download_header)
-        print(f"[Cliente] Conexión con el servidor aceptada!")
+        logging.info("[Cliente] Conexión con el servidor aceptada!")
         self.send_ack(ack_with_data.datagram_number)
 
         self.socket.settimeout(None)
+        logging.info(print(f"[Cliente] Número de datagramas a recibir: {ack_with_data.total_datagrams}"))
         self.receiving_operation(ack_with_data.total_datagrams, ack_with_data.file_name)
 
     def _start_client_upload(self, file_name):
-        print(f"[Cliente] Accion a realizar: Carga de un archivo al servidor")
+        logging.info(print(f"[Cliente] Se desea cargar un archivo al servidor"))
 
         # Armo el header UPLOAD
         file_size = files_management.get_file_size(file_name)
         total_datagrams = files_management.get_count_of_datagrams_sack(file_name)
         upload_header = SackDatagram.create_upload_header_client(file_name, file_size, total_datagrams)
-        print(f"[Cliente] Número de datagramas a enviar: {total_datagrams}")
+        logging.info(print(f"[Cliente] Número de datagramas a enviar: {total_datagrams}"))
 
         # Envio el header
         self.socket.sendto(upload_header.get_datagram_bytes(), self.address)
         # Espero el ACK para poder comenzar a enviar
-        print(f"[Cliente] Esperando a que el servidor acepte la conexión")
+        logging.info("[Cliente] Esperando a que el servidor acepte la conexión")
         self.wait_ack(upload_header)
         # Comienzo a enviar el archivo una vez recibido confirmación del header!
-        print(f"[Cliente] Conexión con el servidor aceptada!")
+        logging.info("[Cliente] Conexión con el servidor aceptada!")
         self.sending_operation(file_name)
 
     # Wait ack: espera que llegue un ack, si no llega, reenvia el datagrama
@@ -132,7 +138,6 @@ class SelectiveAck:
     # Send sack: envia un sack con un ack_number y con una lista de sacks
     def send_sack(self, ack_number, list_of_sacks):
         # Envio el sack
-        print(f"Enviando ack: numero_ack-{ack_number}, cantidad_sacks-{len(list_of_sacks)} ,lista_sacks-{self.fill_with_ceros(list_of_sacks)}")
         sack_datagram = SackDatagram.create_sack(ack_number, len(list_of_sacks), self.fill_with_ceros(list_of_sacks))
         bytes = sack_datagram.get_datagram_bytes()
         self.socket.sendto(bytes, self.address)
@@ -142,7 +147,6 @@ class SelectiveAck:
         # Itera sobre el window size o los datagramas, lo que sea menor
         for i in range(min(window_size_remaining, len(datagrams))):
             # Generar un número aleatorio entre 0 y 1
-            print("Enviando datagrama #: ", datagrams[i].datagram_number)
             self.socket.sendto(datagrams[i].get_datagram_bytes(), self.address)
         return min(window_size_remaining, len(datagrams))
 
@@ -152,7 +156,7 @@ class SelectiveAck:
         try:
             file_contents = files_management.get_file_content(file_name)
         except:
-            raise "Archivo no encontrado"
+            raise "Archivo no encontrado en la dirección especificada :("
 
         self.socket.settimeout(TIMEOUT_CLIENT)
 
@@ -164,6 +168,10 @@ class SelectiveAck:
         last_ack_number = 0
         ack_repetitions = 0
 
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Comenzando a enviar el archivo solicitado")) if self.is_server \
+            else logging.info(print(f"[Cliente] Comenzando a enviar el archivo al servidor"))
+
+        begin = time.time()
         while datagrams or datagrams_flying:
             datagrams_sending = self.send_datagrams(datagrams, window_size_remaining)
             window_size_remaining -= datagrams_sending
@@ -189,7 +197,6 @@ class SelectiveAck:
                 continue
 
             if datagram_deserialized.datagram_type == TypeOfSackDatagram.SACK.value:
-                print(f"SACK {datagram_deserialized.datagram_number} recibido ")
                 # Manejo el ack repetido
                 window_size_remaining += self.remove_datagram_from_flying(datagrams_flying, datagram_deserialized)
                 if last_ack_number != datagram_deserialized.datagram_number:
@@ -201,8 +208,6 @@ class SelectiveAck:
                     datagram_to_resend = None
 
                     if ack_repetitions >= MAX_ACK_REPETITIONS:
-                        print("Se detecto un ACK repetido que supera el limite de repeticiones, "
-                              "reenvio el datagrama # ", last_ack_number)
                         # Reenvio el paquete
                         for datagram in datagrams_flying:
                             if datagram.datagram_number == last_ack_number:
@@ -224,6 +229,13 @@ class SelectiveAck:
                         if datagram.datagram_number in range(sack_begin, sack_end):
                             datagrams_flying.remove(datagram)
                             window_size_remaining += 1
+
+        end = time.time()
+        sending_time = end - begin
+
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Archivo enviado correctamente en {sending_time}ms")) \
+            if self.is_server else logging.info(print( f"[Cliente] Archivo subido correctamente en {sending_time}ms"))
+
 
     # TODO modificar el return para que devuelva el windows size directamente
     @staticmethod
@@ -271,6 +283,12 @@ class SelectiveAck:
         # Ultimo ack que mande 
         last_ack_number = 1
 
+        logging.info(
+            print(f"[SERVIDOR - Hilo #{self.address}] Comenzando a recibir el archivo del cliente")) if self.is_server \
+            else logging.info(print(f"[Cliente] Comenzando a descargar el archivo del servidor"))
+
+        begin = time.time()
+
         while len(received_datagrams_numbers) < total_datagrams:
             datagram_deserialized = -1
             if self.is_server:
@@ -279,17 +297,11 @@ class SelectiveAck:
                 datagram, address = self.socket.recvfrom(SACK_DATAGRAM_SIZE)
                 datagram_deserialized = SackDatagramDeserialized(datagram)
 
-            #Se perdio la confirmacion del ack de descarga, lo reenvio de vuelta.
-            # TODO: Se puede arreglar metiendo este if en un while que si entra al if, se envie el mismo mensaje de
-            #       confirmacion de la operacion. Se itera hasta que se recibe el ack. Del otro lado tambien debe haber
-            #       un while con condicion de corte de que si sigue llegando el mismo paquete de confirmacion, se vuelva
-            #       a enviar el ack.
             if ((datagram_deserialized.datagram_type == TypeOfSackDatagram.HEADER_UPLOAD.value) or
                     (datagram_deserialized.datagram_type == TypeOfSackDatagram.HEADER_DOWNLOAD.value)):
                 self.send_ack(0)
                 continue
 
-            print(f"Recibido: {datagram_deserialized.datagram_number}/{total_datagrams}")
             # En caso de haber recibido un datagrama que no habia recibido antes lo guardo y proceso
             # Si ya lo habia recibido lo descarto.
             if datagram_deserialized.datagram_number not in received_datagrams_numbers:
@@ -303,11 +315,17 @@ class SelectiveAck:
 
         for i in range(0,14):
             self.send_sack(last_ack_number, [])
-    
-        print("--------------------------------------------------------------------------")
-        print(f"[SERVIDOR - Hilo #{self.address}] Creado con éxito el archivo {file_name}")
-        print("--------------------------------------------------------------------------")
+
+        end = time.time()
+        receiving_time = end - begin
+
         files_management.create_new_file(received_data, file_name)
+
+        print("-------------------------------------------------------------------------------------------")
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Recibido con éxito el archivo {file_name} en"
+                           f" {receiving_time}ms"))  if self.is_server \
+            else logging.info(print(f"[Cliente] Descargado con éxito el archivo {file_name} en {receiving_time}ms"))
+        print("-------------------------------------------------------------------------------------------")
 
     def fill_with_ceros(self, list_of_sacks):
         while len(list_of_sacks) < 4:
