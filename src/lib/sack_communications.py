@@ -9,8 +9,8 @@ class TypeOfSackDatagram(Enum):
     SACK = 5
 
 N = 256
-SACK_FRAGMENT_SIZE = 1343
-SACK_DATAGRAM_SIZE = 1496
+SACK_FRAGMENT_SIZE = 1200
+SACK_DATAGRAM_SIZE = 1353
 
 class SackDatagramDeserialized:
 
@@ -28,7 +28,7 @@ class SackDatagramDeserialized:
         self.sack_number = struct.unpack('<I', bytes_flow[141:145])[0]  # 4 bytes
         self.total_datagrams = struct.unpack('<I', bytes_flow[145:149])[0]  # 4 bytes
         self.datagram_size = struct.unpack('<I', bytes_flow[149:153])[0]  # 4 bytes
-        self.content = bytes_flow[153:153 + SACK_FRAGMENT_SIZE]  # 1343 bytes
+        self.content = bytes_flow[153:(153 + SACK_FRAGMENT_SIZE)]  # 1200 bytes
         self.content = self.content[:self.datagram_size]
 
 

@@ -10,8 +10,8 @@ class TypeOfSwDatagram(Enum):
 
 
 N = 256
-SW_FRAGMENT_SIZE = 1343
-SW_DATAGRAM_SIZE = 1460
+SW_FRAGMENT_SIZE = 1300
+SW_DATAGRAM_SIZE = 1417
 
 
 class SwDatagramDeserialized:
@@ -23,7 +23,7 @@ class SwDatagramDeserialized:
         self.datagram_number = struct.unpack('<I', bytes_flow[105:109])[0] # 4 bytes
         self.total_datagrams = struct.unpack('<I', bytes_flow[109:113])[0] # 4 bytes
         self.datagram_size = struct.unpack('<I', bytes_flow[113:117])[0] # 4 bytes
-        self.content = bytes_flow[117:1460] # 1343
+        self.content = bytes_flow[117:1417] # 1343
         self.content = self.content[:self.datagram_size]
 
         # TODO: Porque falla el packjet size llega mal. Los campos llegan todos mal?
