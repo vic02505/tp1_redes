@@ -4,10 +4,8 @@ from lib.sw_communications import TypeOfSwDatagram, SwDatagramDeserialized, SwDa
 import lib.files_management as files_management
 import logging
 
-
 TIMEOUT_CLIENT = 0.1
 TIMEOUT_SERVER = 0.1
-
 
 class StopAndWait:
     def __init__(self, socket, destination_address, messages_queue, is_server):
@@ -143,7 +141,7 @@ class StopAndWait:
 
         end = time.time()
         sending_time = end - begin
-        logging.info(f"[CLIENTE] Archivo enviado con éxito en {sending_time}ms")
+        logging.info(f"[CLIENTE] Archivo enviado con éxito en {sending_time}segs")
 
 
     def receive_server_file(self, total_datagrams, file_name, datagram_number):
@@ -165,7 +163,7 @@ class StopAndWait:
 
         files_management.create_new_file(received_data, file_name)
         logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Recibido con éxito el archivo {file_name} en " 
-                           f"{receiving_time}ms"))
+                           f"{receiving_time}segs"))
 
     # Operaciones para el DOWNLOAD
     def recive_client_file(self, total_datagrams, file_name):
@@ -187,7 +185,7 @@ class StopAndWait:
         receiving_time = end - begin
 
         files_management.create_new_file(received_data, file_name)
-        logging.info(print(f"[Cliente] Descarga realizada con éxito en {receiving_time}ms"))
+        logging.info(print(f"[Cliente] Descarga realizada con éxito en {receiving_time}segs"))
 
     def send_server_file(self, file_name):
         # Busca el archivo.
@@ -209,4 +207,4 @@ class StopAndWait:
 
         end = time.time()
         sending_time = end - begin
-        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Archivo enviado con éxito en {sending_time}ms"))
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Archivo enviado con éxito en {sending_time}segs"))

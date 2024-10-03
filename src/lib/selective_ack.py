@@ -233,8 +233,8 @@ class SelectiveAck:
         end = time.time()
         sending_time = end - begin
 
-        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Archivo enviado correctamente en {sending_time}ms")) \
-            if self.is_server else logging.info(print( f"[Cliente] Archivo subido correctamente en {sending_time}ms"))
+        logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Archivo enviado correctamente en {sending_time}segs")) \
+            if self.is_server else logging.info(print( f"[Cliente] Archivo subido correctamente en {sending_time}segs"))
 
 
     # TODO modificar el return para que devuelva el windows size directamente
@@ -323,8 +323,8 @@ class SelectiveAck:
 
         print("-------------------------------------------------------------------------------------------")
         logging.info(print(f"[SERVIDOR - Hilo #{self.address}] Recibido con éxito el archivo {file_name} en"
-                           f" {receiving_time}ms"))  if self.is_server \
-            else logging.info(print(f"[Cliente] Descargado con éxito el archivo {file_name} en {receiving_time}ms"))
+                           f" {receiving_time}segs"))  if self.is_server \
+            else logging.info(print(f"[Cliente] Descargado con éxito el archivo {file_name} en {receiving_time}segs"))
         print("-------------------------------------------------------------------------------------------")
 
     def fill_with_ceros(self, list_of_sacks):
